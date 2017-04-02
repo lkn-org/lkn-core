@@ -1,0 +1,69 @@
+#
+# lkn: an actor-based multiplayer game engine
+# Copyright (C) 2017 Thomas “Letan <contact@thomasletan.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+---
+- hosts: lethio
+  remote_user: root
+  tasks:
+    - name: create root directory if necessary
+      become: yes
+      become_user: www-data
+      file:
+        path: /srv/lkn
+        state: directory
+    - name: create docs directory if necessary
+      become: yes
+      become_user: www-data
+      file:
+        path: /srv/lkn/docs
+        state: directory
+    - name: create cover directory if necessary
+      become: yes
+      become_user: www-data
+      file:
+        path: /srv/lkn/cover
+        state: directory
+    - name: copy index
+      become: yes
+      become_user: www-data
+      synchronize:
+        src: ../index.html
+        dest: /srv/lkn/
+    - name: copy docs
+      become: yes
+      become_user: www-data
+      synchronize:
+        src: ../doc/
+        dest: /srv/lkn/docs
+    - name: copy cover
+      become: yes
+      become_user: www-data
+      synchronize:
+        src: ../cover/
+        dest: /srv/lkn/cover
+    - name: create conf directory if necessary
+      file:
+        path: /etc/nginx/sites-enabled
+        state: directory
+    - name: push nginx configuration
+      copy:
+        src: lkn.conf
+        dest: /etc/nginx/sites-enabled/
+    - name: restart nginx
+      service:
+        name: nginx
+        state: restarted
