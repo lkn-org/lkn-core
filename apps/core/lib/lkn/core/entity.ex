@@ -85,7 +85,12 @@ defmodule Lkn.Core.Entity do
 
   @spec get_component(t, System.m) :: Option.t(Component.m)
   def get_component(key, sys) do
-    Agent.get(Lkn.Core.Name.comps_list(key), &Map.fetch(&1, sys))
+    r = Agent.get(Lkn.Core.Name.comps_list(key), &Map.fetch(&1, sys))
+
+    case r do
+      {:ok, t} -> Option.some(t)
+      _ -> Option.none()
+    end
   end
 
   @spec has_component?(t, System.m) :: boolean
@@ -96,9 +101,9 @@ defmodule Lkn.Core.Entity do
     end
   end
 
-  @spec systems(t) :: [System.m]
+  @spec systems(t) :: %{System.m => module}
   def systems(key) do
-    Agent.get(Lkn.Core.Name.comps_list(key), &Map.keys(&1))
+    Agent.get(Lkn.Core.Name.comps_list(key), fn r -> r end)
   end
 
   @spec read(t, Lkn.Core.Properties.prop) :: Option.t(Lkn.Core.Properties.value)

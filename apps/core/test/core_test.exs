@@ -40,7 +40,7 @@ defmodule Lkn.Core.Test do
       puppet_component: Component,
       map_component: Map
 
-    def init_state(_map_key) do
+    def init_state(_map_key, _comp) do
       :ok
     end
 

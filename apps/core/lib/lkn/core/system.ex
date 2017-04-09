@@ -20,6 +20,8 @@ defmodule Lkn.Core.System do
   A behaviour module for implementing a System.
   """
 
+  use Lkn.Foundation
+
   alias Lkn.Core.Entity
   alias Lkn.Core.Name
   alias Lkn.Core.System
@@ -32,21 +34,24 @@ defmodule Lkn.Core.System do
 
     defstruct [
       :map_key,
+      :map_comp,
       :instance_key,
       :entities,
     ]
 
     @type t :: %State{
       map_key: Entity.t,
+      map_comp: module,
       instance_key: Instance.t,
       entities: System.entities,
     }
 
-    @spec new(Instance.t, term) :: t
-    def new(instance_key, map_key) do
+    @spec new(Instance.t, term, module) :: t
+    def new(instance_key, map_key, map_comp) do
       %State{
-        entities: Map.new,
+        entities: Map.new(),
         instance_key: instance_key,
+        map_comp: map_comp,
         map_key: map_key,
       }
     end
@@ -86,10 +91,12 @@ defmodule Lkn.Core.System do
     quote location: :keep do
       require Logger
 
+      use Lkn.Foundation
+
       use GenServer
       @type state :: unquote(state_t)
 
-      @callback init_state(Entity.t) :: state
+      @callback init_state(Entity.t, module) :: state
 
       def component(:puppet) do
         unquote(ec)
@@ -140,7 +147,7 @@ defmodule Lkn.Core.System do
       defp priv_handle_cast({:register_entity, entity_key}, priv: priv, pub: pub) do
         {priv, pub} =
           case Lkn.Core.Entity.get_component(entity_key, __MODULE__) do
-            {:ok, module} ->
+            Option.some(module) ->
               {State.put(priv, entity_key, module), entity_enter(pub, priv.entities, entity_key)}
             _ ->
               {priv, pub}
@@ -200,11 +207,11 @@ defmodule Lkn.Core.System do
     end
   end
 
-  def start_link(module, instance_key, map_key) do
+  def start_link(module, instance_key, map_key, map_comp) do
     GenServer.start_link(module,
       [
-        priv: State.new(instance_key, map_key),
-        pub: module.init_state(map_key),
+        priv: State.new(instance_key, map_key, map_comp),
+        pub: module.init_state(map_key, map_comp),
       ],
       name: Name.system(instance_key, module))
   end
