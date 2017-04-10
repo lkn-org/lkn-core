@@ -1,17 +1,11 @@
-# lkn.
+# lkn. [![Build Status](https://travis-ci.org/lkn-org/lkn.svg?branch=master)](https://travis-ci.org/lkn-org/lkn) [![Coverage Status](https://coveralls.io/repos/github/lkn-org/lkn/badge.svg)](https://coveralls.io/github/lkn-org/lkn)
 
-**lkn.** is an attempt to write a playable 2D MMORPG with Elixir and an
+**lkn** is an attempt to write a playable 2D MMORPG with Elixir and an
 actor-based model.
-
-## Components
-
-### lkn.foundation
-
-### lkn.core
 
 ## Getting Started
 
-The **lkn.** codebase is kept under [pijul](https://pijul.com) vcs. To get the
+The **lkn** codebase is kept under [pijul](https://pijul.com) vcs. To get the
 code, you have to use `pijul clone`:
 
 ```
@@ -27,3 +21,5 @@ make
 # build doc, generate test coverage, execute the tests
 make test
 ```
+
+For convenience, we also have a [git mirror](https://github.com/lkn-org/lkn).
