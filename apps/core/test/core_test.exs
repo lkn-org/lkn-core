@@ -22,9 +22,12 @@ defmodule Lkn.Core.Test do
   doctest Lkn.Core.Entity
 
   use Lkn.Foundation
+
+  alias Lkn.Core.Component
+  alias Lkn.Core.Instance
   alias Lkn.Core.Name
   require Lkn.Core.Component
-  alias Lkn.Core.Component
+
 
   defmodule Test.Puppeteer do
     use GenServer
@@ -114,12 +117,17 @@ defmodule Lkn.Core.Test do
   defmodule Test.Map do
     use Lkn.Core.Entity, components: [Test.Map.Component]
 
-    def start_link(key) do
-      Lkn.Core.Entity.start_link(__MODULE__, key, [])
+    def start_link(key, delay \\ Option.some(100)) do
+      Lkn.Core.Entity.start_link(__MODULE__, key, delay)
     end
 
-    def init_properties([]) do
-      %{:delay => 100, :limit => 2}
+    def init_properties(delay) do
+      case delay do
+        Option.some(delay) ->
+          %{:delay => delay, :limit => 2}
+        Option.none() ->
+          %{:limit => 2}
+      end
     end
   end
 
@@ -312,5 +320,68 @@ defmodule Lkn.Core.Test do
     instance_key3 = Test.Puppeteer.find_instance(puppeteer_key3, map_key)
 
     assert(instance_key3 != instance_key1)
+  end
+
+  test "lock then try to register" do
+    map_key = UUID.uuid4()
+    puppeteer_key1 = UUID.uuid4()
+    puppeteer_key2 = UUID.uuid4()
+
+    {:ok, _} = Test.Map.start_link(map_key)
+    :ok = Lkn.Core.Pool.spawn_pool(map_key)
+
+    {:ok, _} = Test.Puppeteer.start_link(puppeteer_key1)
+    {:ok, _} = Test.Puppeteer.start_link(puppeteer_key2)
+
+    instance_key1 = Test.Puppeteer.find_instance(puppeteer_key1, map_key)
+
+    Instance.lock(instance_key1)
+
+    instance_key2 = Test.Puppeteer.find_instance(puppeteer_key2, map_key)
+
+    assert(instance_key1 != instance_key2)
+  end
+
+  test "register then unregister (no delay for the map)" do
+    map_key = UUID.uuid4()
+    puppeteer_key = UUID.uuid4()
+
+    {:ok, _} = Test.Puppeteer.start_link(puppeteer_key)
+
+    {:ok, _} = Test.Map.start_link(map_key, Option.none())
+    :ok = Lkn.Core.Pool.spawn_pool(map_key)
+
+    instance_key = Test.Puppeteer.find_instance(puppeteer_key, map_key)
+    Test.Puppeteer.leave_instance(puppeteer_key, instance_key)
+
+    Process.sleep(10)
+
+    instance_key2 = Test.Puppeteer.find_instance(puppeteer_key, map_key)
+
+    assert(instance_key2 != instance_key)
+  end
+
+  test "register, lock then unregister" do
+    map_key = UUID.uuid4()
+    puppeteer_key = UUID.uuid4()
+
+    {:ok, _} = Test.Puppeteer.start_link(puppeteer_key)
+
+    {:ok, _} = Test.Map.start_link(map_key)
+    :ok = Lkn.Core.Pool.spawn_pool(map_key)
+
+    instance_key = Test.Puppeteer.find_instance(puppeteer_key, map_key)
+
+    [{pid, _}] = Registry.lookup(Lkn.Core.Registry, {:instance, instance_key})
+    Process.monitor(pid)
+
+    Instance.lock(instance_key)
+
+    Test.Puppeteer.leave_instance(puppeteer_key, instance_key)
+
+    receive do
+      {:DOWN, _, _, _, _} -> :ok
+      after 100 -> assert false
+    end
   end
 end
