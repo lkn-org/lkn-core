@@ -7,12 +7,15 @@ defmodule RpgTest do
   alias Lkn.Core.Instance
   alias Lkn.Core.Name
   alias Lkn.Core.Pool
+  alias Lkn.Core.Puppeteer
 
   alias Lkn.Rpg.Action
   alias Lkn.Rpg.Map
   alias Lkn.Rpg.Puppet
 
   defmodule Test.Puppeteer do
+    @behaviour Puppeteer
+
     use GenServer
 
     def start_link(puppeteer_key) do
@@ -21,6 +24,9 @@ defmodule RpgTest do
 
     def init(s) do
       {:ok, s}
+    end
+
+    def force_unregister(_puppeteer_key, from: _instance_key) do
     end
 
     def find_instance(puppeteer_key, map_key) do

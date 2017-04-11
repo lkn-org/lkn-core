@@ -83,6 +83,15 @@ defmodule Lkn.Core.Instance do
       %State{state|locked: true}
     end
 
+    @spec kick_all(t) :: :ok
+    def kick_all(state) do
+      Enum.map(state.puppeteers, fn {key, mod} ->
+        mod.force_unregister(key, from: state.instance_key)
+      end)
+
+      :ok
+    end
+
     @spec zombify(t) :: t
     def zombify(state) do
       if Map.size(state.puppeteers) == 0 do
@@ -209,6 +218,17 @@ defmodule Lkn.Core.Instance do
     :ok
   end
 
+  @doc """
+  After `kick_all/1` returns, the Instance is empty.
+
+  If `lock/1` has been called before, the Instance should quickly
+  exit.
+  """
+  @spec kick_all(t) :: :ok
+  def kick_all(instance_key) do
+    GenServer.cast(Name.instance(instance_key), :kick_all)
+  end
+
   @doc false
   @spec kill(t) :: boolean
   def kill(instance_key) do
@@ -239,6 +259,10 @@ defmodule Lkn.Core.Instance do
     end
   end
 
+  def handle_cast(:kick_all, state) do
+    State.kick_all(state)
+    {:noreply, state}
+  end
   def handle_cast({:unregister_puppeteer, puppeteer_key}, state) do
     {:noreply, State.unregister_puppeteer(state, puppeteer_key)}
   end

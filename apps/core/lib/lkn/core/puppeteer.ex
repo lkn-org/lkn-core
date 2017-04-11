@@ -16,6 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 defmodule Lkn.Core.Puppeteer do
+  alias Lkn.Core.Instance
+
   @type t :: any
   @type m :: module
+
+  @callback force_unregister(t, from: Instance.t) :: :ok
 end

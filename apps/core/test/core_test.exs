@@ -26,10 +26,14 @@ defmodule Lkn.Core.Test do
   alias Lkn.Core.Component
   alias Lkn.Core.Instance
   alias Lkn.Core.Name
+  alias Lkn.Core.Puppeteer
+
   require Lkn.Core.Component
 
 
   defmodule Test.Puppeteer do
+    @behaviour Puppeteer
+
     use GenServer
 
     def start_link(puppeteer_key) do
@@ -38,6 +42,10 @@ defmodule Lkn.Core.Test do
 
     def init(s) do
       {:ok, s}
+    end
+
+    def force_unregister(puppeteer_key, from: instance_key) do
+      GenServer.cast(Name.puppeteer(puppeteer_key), {:force_unregister, instance_key})
     end
 
     def find_instance(puppeteer_key, map_key) do
@@ -58,6 +66,12 @@ defmodule Lkn.Core.Test do
       {:reply, Lkn.Core.Pool.register_puppeteer(map_key, pk, __MODULE__), state}
     end
 
+    def handle_cast({:force_unregister, instance}, state = {pk, target}) do
+      send(target, :kick)
+      leave_instance(pk, instance)
+
+      {:noreply, state}
+    end
     def handle_cast({:leave_instance, instance_key}, state = {pk, _target}) do
       Lkn.Core.Instance.unregister_puppeteer(instance_key, pk)
 
@@ -378,6 +392,34 @@ defmodule Lkn.Core.Test do
     Instance.lock(instance_key)
 
     Test.Puppeteer.leave_instance(puppeteer_key, instance_key)
+
+    receive do
+      {:DOWN, _, _, _, _} -> :ok
+      after 100 -> assert false
+    end
+  end
+
+  test "register, lock then kick" do
+    map_key = UUID.uuid4()
+    puppeteer_key = UUID.uuid4()
+
+    {:ok, _} = Test.Puppeteer.start_link(puppeteer_key)
+
+    {:ok, _} = Test.Map.start_link(map_key)
+    :ok = Lkn.Core.Pool.spawn_pool(map_key)
+
+    instance_key = Test.Puppeteer.find_instance(puppeteer_key, map_key)
+
+    [{pid, _}] = Registry.lookup(Lkn.Core.Registry, {:instance, instance_key})
+    Process.monitor(pid)
+
+    Instance.lock(instance_key)
+    Instance.kick_all(instance_key)
+
+    receive do
+      :kick -> :ok
+      after 100 -> assert false
+    end
 
     receive do
       {:DOWN, _, _, _, _} -> :ok
