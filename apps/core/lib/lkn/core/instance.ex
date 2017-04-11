@@ -50,15 +50,17 @@ defmodule Lkn.Core.Instance do
     @moduledoc false
 
     defstruct [
+      :locked,
       :mode,
       :map_key,
       :instance_key,
       :puppeteers,
     ]
 
-    @type mode :: :running|{:zombie, Recipe.t}
+    @type mode :: :running|{:zombie, Option.t(Recipe.t)}
 
     @type t :: %State {
+      locked: boolean,
       mode: mode,
       map_key: Entity.t,
       instance_key: Instance.t,
@@ -68,6 +70,7 @@ defmodule Lkn.Core.Instance do
     @spec new(Entity.t, Instance.t) :: t
     def new(map_key, instance_key) do
       %State{
+        locked:     false,
         mode:       :running,
         map_key:    map_key,
         instance_key: instance_key,
@@ -75,38 +78,57 @@ defmodule Lkn.Core.Instance do
       }
     end
 
+    @spec lock(t) :: t
+    def lock(state) do
+      %State{state|locked: true}
+    end
+
     @spec zombify(t) :: t
     def zombify(state) do
       if Map.size(state.puppeteers) == 0 do
         case Entity.read(state.map_key, :delay) do
           Option.some(delay) ->
-            {:ok, timer} = Recipe.start_link(state.map_key)
-            callback = Option.some(&(Pool.kill_request(&1, state.instance_key)))
-            timer
-            |> Recipe.set_duration(delay, callback)
-            |> Recipe.start
-            %State{state|mode: {:zombie, timer}}
+            if !state.locked do
+              {:ok, timer} = Recipe.start_link(state.map_key)
+
+              callback = Option.some(&(Pool.kill_request(&1, state.instance_key)))
+
+              timer
+              |> Recipe.set_duration(delay, callback)
+              |> Recipe.start
+
+              %State{state|mode: {:zombie, Option.some(timer)}}
+            else
+              # we have been locked so nobody will be able to join the instance again,
+              # there is no need to wait.
+              Pool.kill_request(state.map_key, state.instance_key)
+
+              %State{state|mode: {:zombie, Option.none()}}
+            end
           Option.none() ->
-            state
+            # there is no specified delay, so we can die right now
+            Pool.kill_request(state.map_key, state.instance_key)
+
+            %State{state|mode: {:zombie, Option.none()}}
         end
       else
         state
       end
     end
 
-    @spec full?(t) :: boolean
-    def full?(state) do
-      case Entity.read(state.map_key, :limit) do
-        Option.some(limit) -> Map.size(state.puppeteers) == limit
-        Option.none() -> false
-      end
+    @spec closed?(t) :: boolean
+    def closed?(state) do
+      state.locked || case Entity.read(state.map_key, :limit) do
+                        Option.some(limit) -> Map.size(state.puppeteers) == limit
+                        Option.none() -> false
+                      end
     end
 
     @spec register_puppeteer(t, Puppeteer.t, Puppeteer.m) :: t
     def register_puppeteer(state, puppeteer_key, puppeteer_module) do
       state =  %State{state|puppeteers: Map.put(state.puppeteers, puppeteer_key, puppeteer_module)}
       case state.mode do
-        {:zombie, timer} ->
+        {:zombie, Option.some(timer)} ->
             Recipe.cancel(timer)
             %State{state|mode: :running}
         _ -> state
@@ -178,6 +200,15 @@ defmodule Lkn.Core.Instance do
     GenServer.call(Name.instance(instance_key), {:register_puppeteer, puppeteer_key, puppeteer_module})
   end
 
+  @doc """
+  After `lock/1` returns, the Instance refuses to register new puppeteers.
+  """
+  @spec lock(t) :: :ok
+  def lock(instance_key) do
+    GenServer.call(Name.instance(instance_key), :lock)
+    :ok
+  end
+
   @doc false
   @spec kill(t) :: boolean
   def kill(instance_key) do
@@ -191,8 +222,11 @@ defmodule Lkn.Core.Instance do
     Registry.unregister(Lkn.Core.Notifier, Name.notify_group(instance_key))
   end
 
+  def handle_call(:lock, _from, state) do
+    {:reply, :ok, State.lock(state)}
+  end
   def handle_call({:register_puppeteer, puppeteer_key, puppeteer_module}, _from, state) do
-    if !State.full?(state) do
+    if !State.closed?(state) do
       {:reply, true, State.register_puppeteer(state, puppeteer_key, puppeteer_module)}
     else
       {:reply, false, state}
