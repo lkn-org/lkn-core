@@ -62,7 +62,7 @@ defmodule Lkn.Core.Instance do
       mode: mode,
       map_key: Entity.t,
       instance_key: Instance.t,
-      puppeteers: MapSet.t(Puppeteer.t),
+      puppeteers: %{Puppeteer.t => Puppeteer.m},
     }
 
     @spec new(Entity.t, Instance.t) :: t
@@ -71,13 +71,13 @@ defmodule Lkn.Core.Instance do
         mode:       :running,
         map_key:    map_key,
         instance_key: instance_key,
-        puppeteers: MapSet.new(),
+        puppeteers: Map.new(),
       }
     end
 
     @spec zombify(t) :: t
     def zombify(state) do
-      if MapSet.size(state.puppeteers) == 0 do
+      if Map.size(state.puppeteers) == 0 do
         case Entity.read(state.map_key, :delay) do
           Option.some(delay) ->
             {:ok, timer} = Recipe.start_link(state.map_key)
@@ -97,14 +97,14 @@ defmodule Lkn.Core.Instance do
     @spec full?(t) :: boolean
     def full?(state) do
       case Entity.read(state.map_key, :limit) do
-        Option.some(limit) -> MapSet.size(state.puppeteers) == limit
+        Option.some(limit) -> Map.size(state.puppeteers) == limit
         Option.none() -> false
       end
     end
 
-    @spec register_puppeteer(t, Puppeteer.t) :: t
-    def register_puppeteer(state, puppeteer_key) do
-      state =  %State{state|puppeteers: MapSet.put(state.puppeteers, puppeteer_key)}
+    @spec register_puppeteer(t, Puppeteer.t, Puppeteer.m) :: t
+    def register_puppeteer(state, puppeteer_key, puppeteer_module) do
+      state =  %State{state|puppeteers: Map.put(state.puppeteers, puppeteer_key, puppeteer_module)}
       case state.mode do
         {:zombie, timer} ->
             Recipe.cancel(timer)
@@ -115,7 +115,7 @@ defmodule Lkn.Core.Instance do
 
     @spec unregister_puppeteer(t, Puppeteer.t) :: t
     def unregister_puppeteer(state, puppeteer_key) do
-      %State{state|puppeteers: MapSet.delete(state.puppeteers, puppeteer_key)}
+      %State{state|puppeteers: Map.delete(state.puppeteers, puppeteer_key)}
       |> zombify
     end
   end
@@ -173,9 +173,9 @@ defmodule Lkn.Core.Instance do
   end
 
   @doc false
-  @spec register_puppeteer(t, Puppeteer.t) :: boolean
-  def register_puppeteer(instance_key, puppeteer_key) do
-    GenServer.call(Name.instance(instance_key), {:register_puppeteer, puppeteer_key})
+  @spec register_puppeteer(t, Puppeteer.t, Puppeteer.m) :: boolean
+  def register_puppeteer(instance_key, puppeteer_key, puppeteer_module) do
+    GenServer.call(Name.instance(instance_key), {:register_puppeteer, puppeteer_key, puppeteer_module})
   end
 
   @doc false
@@ -187,11 +187,13 @@ defmodule Lkn.Core.Instance do
   @spec unregister_puppeteer(t, Puppeteer.t) :: :ok
   def unregister_puppeteer(instance_key, puppeteer_key) do
     GenServer.cast(Name.instance(instance_key), {:unregister_puppeteer, puppeteer_key})
+
+    Registry.unregister(Lkn.Core.Notifier, Name.notify_group(instance_key))
   end
 
-  def handle_call({:register_puppeteer, puppeteer_key}, _from, state) do
+  def handle_call({:register_puppeteer, puppeteer_key, puppeteer_module}, _from, state) do
     if !State.full?(state) do
-      {:reply, true, State.register_puppeteer(state, puppeteer_key)}
+      {:reply, true, State.register_puppeteer(state, puppeteer_key, puppeteer_module)}
     else
       {:reply, false, state}
     end

@@ -17,4 +17,5 @@
 #
 defmodule Lkn.Core.Puppeteer do
   @type t :: any
+  @type m :: module
 end

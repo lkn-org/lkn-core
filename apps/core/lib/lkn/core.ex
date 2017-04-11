@@ -60,6 +60,11 @@ defmodule Lkn.Core do
       {:via, Registry, {Lkn.Core.Registry, {:instance, instance_key}}}
     end
 
+    @spec puppeteer(Puppeteer.t) :: t
+    def puppeteer(puppeteer_key) do
+      {:via, Registry, {Lkn.Core.Registry, {:puppeteer, puppeteer_key}}}
+    end
+
     @spec pool(Entity.t) :: t
     def pool(map_key) do
       {:via, Registry, {Lkn.Core.Registry, {:pool, map_key}}}

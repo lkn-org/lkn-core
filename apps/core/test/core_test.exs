@@ -26,6 +26,42 @@ defmodule Lkn.Core.Test do
   require Lkn.Core.Component
   alias Lkn.Core.Component
 
+  defmodule Test.Puppeteer do
+    use GenServer
+
+    def start_link(puppeteer_key) do
+      GenServer.start_link(__MODULE__, {puppeteer_key, self()}, name: Name.puppeteer(puppeteer_key))
+    end
+
+    def init(s) do
+      {:ok, s}
+    end
+
+    def find_instance(puppeteer_key, map_key) do
+      GenServer.call(Name.puppeteer(puppeteer_key), {:find_instance, map_key})
+    end
+
+    def leave_instance(puppeteer_key, instance_key) do
+      GenServer.cast(Name.puppeteer(puppeteer_key), {:leave_instance, instance_key})
+    end
+
+    def handle_info(msg, state = {_pk, target}) do
+      send(target, msg)
+
+      {:noreply, state}
+    end
+
+    def handle_call({:find_instance, map_key}, _from, state = {pk, _target}) do
+      {:reply, Lkn.Core.Pool.register_puppeteer(map_key, pk, __MODULE__), state}
+    end
+
+    def handle_cast({:leave_instance, instance_key}, state = {pk, _target}) do
+      Lkn.Core.Instance.unregister_puppeteer(instance_key, pk)
+
+      {:noreply, state}
+    end
+  end
+
   defmodule Test.System do
     defmodule Component do
       @callback level_up(key :: any) :: {:level_up, key :: Entity.t, old :: integer, new :: integer}
@@ -160,18 +196,20 @@ defmodule Lkn.Core.Test do
 
   test "spawning everything" do
     map_key = UUID.uuid4()
+    puppeteer_key = UUID.uuid4()
+
+    {:ok, _} = Test.Puppeteer.start_link(puppeteer_key)
 
     {:ok, _} = Test.Map.start_link(map_key)
     :ok = Lkn.Core.Pool.spawn_pool(map_key)
 
-    instance_key = Lkn.Core.Pool.register_puppeteer(map_key, :actor)
+    instance_key = Test.Puppeteer.find_instance(puppeteer_key, map_key)
+
     entity_key = UUID.uuid4()
     ghost_key = UUID.uuid4()
 
     {:ok, _} = Test.Entity.start_link(entity_key, name: "lkn", level: 4)
     {:ok, _} = Test.Ghost.start_link(ghost_key)
-
-    Registry.register(Lkn.Core.Notifier, Name.notify_group(instance_key), [])
 
     0 = Lkn.Core.System.population_size(instance_key, Test.System)
     Lkn.Core.Instance.register_entity(instance_key, entity_key)
@@ -201,16 +239,18 @@ defmodule Lkn.Core.Test do
 
   test "level up" do
     map_key = UUID.uuid4()
+    puppeteer_key = UUID.uuid4()
+
+    {:ok, _} = Test.Puppeteer.start_link(puppeteer_key)
 
     {:ok, _} = Test.Map.start_link(map_key)
     :ok = Lkn.Core.Pool.spawn_pool(map_key)
 
-    instance_key = Lkn.Core.Pool.register_puppeteer(map_key, :actor)
+    instance_key = Test.Puppeteer.find_instance(puppeteer_key, map_key)
+
     entity_key = UUID.uuid4()
 
     {:ok, _} = Test.Entity.start_link(entity_key, name: "lkn", level: 4)
-
-    Registry.register(Lkn.Core.Notifier, Name.notify_group(instance_key), [])
 
     Lkn.Core.Instance.register_entity(instance_key, entity_key)
 
@@ -229,38 +269,48 @@ defmodule Lkn.Core.Test do
 
   test "register then unregister" do
     map_key = UUID.uuid4()
+    puppeteer_key = UUID.uuid4()
+
+    {:ok, _} = Test.Puppeteer.start_link(puppeteer_key)
 
     {:ok, _} = Test.Map.start_link(map_key)
     :ok = Lkn.Core.Pool.spawn_pool(map_key)
 
-    instance_key = Lkn.Core.Pool.register_puppeteer(map_key, :actor)
+    instance_key = Test.Puppeteer.find_instance(puppeteer_key, map_key)
 
-    Lkn.Core.Instance.unregister_puppeteer(instance_key, :actor)
-    Process.sleep(100)
-    instance_key2 = Lkn.Core.Pool.register_puppeteer(map_key, :actor)
+    Test.Puppeteer.leave_instance(puppeteer_key, instance_key)
+    Process.sleep(10)
+    instance_key2 = Test.Puppeteer.find_instance(puppeteer_key, map_key)
 
     assert(instance_key2 == instance_key)
 
-    Lkn.Core.Instance.unregister_puppeteer(instance_key, :actor)
+    Test.Puppeteer.leave_instance(puppeteer_key, instance_key)
     Process.sleep(110)
-    instance_key2 = Lkn.Core.Pool.register_puppeteer(map_key, :actor)
+    instance_key2 = Test.Puppeteer.find_instance(puppeteer_key, map_key)
 
     assert(instance_key2 != instance_key)
   end
 
   test "three registers" do
     map_key = UUID.uuid4()
+    puppeteer_key1 = UUID.uuid4()
+    puppeteer_key2 = UUID.uuid4()
+    puppeteer_key3 = UUID.uuid4()
+
+    {:ok, _} = Test.Puppeteer.start_link(puppeteer_key1)
+    {:ok, _} = Test.Puppeteer.start_link(puppeteer_key2)
+    {:ok, _} = Test.Puppeteer.start_link(puppeteer_key3)
 
     {:ok, _} = Test.Map.start_link(map_key)
     :ok = Lkn.Core.Pool.spawn_pool(map_key)
 
-    instance_key = Lkn.Core.Pool.register_puppeteer(map_key, :actor1)
-    instance_key2 = Lkn.Core.Pool.register_puppeteer(map_key, :actor2)
+    instance_key1 = Test.Puppeteer.find_instance(puppeteer_key1, map_key)
+    instance_key2 = Test.Puppeteer.find_instance(puppeteer_key2, map_key)
 
-    assert(instance_key2 == instance_key)
+    assert(instance_key2 == instance_key1)
 
-    instance_key3 = Lkn.Core.Pool.register_puppeteer(map_key, :actor3)
+    instance_key3 = Test.Puppeteer.find_instance(puppeteer_key3, map_key)
 
-    assert(instance_key3 != instance_key)
+    assert(instance_key3 != instance_key1)
   end
 end

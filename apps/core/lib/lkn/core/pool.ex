@@ -40,6 +40,8 @@ end
 defmodule Lkn.Core.Pool.GenServer do
   @moduledoc false
 
+  require Logger
+
   alias Lkn.Core.Entity
   alias Lkn.Core.Instance
   alias Lkn.Core.Name
@@ -68,6 +70,11 @@ defmodule Lkn.Core.Pool.GenServer do
       }
     end
 
+    @spec supervise?(t, Instance.t) :: boolean
+    def supervise?(state, instance_key) do
+      Enum.member?(state.instances, instance_key)
+    end
+
     @spec add_instance(t, Instance.t) :: t
     def add_instance(state, instance_key) do
       %State{state|instances: [instance_key|state.instances]}
@@ -78,23 +85,26 @@ defmodule Lkn.Core.Pool.GenServer do
       %State{state|instances: List.delete(state.instances, instance_key)}
     end
 
-    @spec find_instance(t, Puppeteer.t) :: {t, Instance.t}
-    def find_instance(state, puppeteer_key) do
-      find_instance_or_spawn(state, state.instances, puppeteer_key)
+    @spec find_instance(t, Puppeteer.t, Puppeteer.m) :: {t, Instance.t}
+    def find_instance(state, puppeteer_key, puppeteer_mod) do
+      find_instance_or_spawn(state, state.instances, puppeteer_key, puppeteer_mod)
     end
 
-    @spec find_instance_or_spawn(t, [Instance.t], Puppeteer.t) :: {t, Instance.t}
-    defp find_instance_or_spawn(state, [instance_key|instances], puppeteer_key) do
-      if Instance.register_puppeteer(instance_key, puppeteer_key) do
+    @spec find_instance_or_spawn(t, [Instance.t], Puppeteer.t, Puppeteer.m) :: {t, Instance.t}
+    defp find_instance_or_spawn(state, [instance_key|instances], puppeteer_key, puppeteer_mod) do
+      if Instance.register_puppeteer(instance_key, puppeteer_key, puppeteer_mod) do
         {state, instance_key}
       else
-        find_instance_or_spawn(state, instances, puppeteer_key)
+        find_instance_or_spawn(state, instances, puppeteer_key, puppeteer_mod)
       end
     end
-    defp find_instance_or_spawn(state, [], puppeteer_key) do
+    defp find_instance_or_spawn(state, [], puppeteer_key, puppeteer_mod) do
       instance_key = UUID.uuid4()
       {:ok, _} = Instance.spawn_instance(state.map_key, instance_key)
-      true = Instance.register_puppeteer(instance_key, puppeteer_key)
+      if !Instance.register_puppeteer(instance_key, puppeteer_key, puppeteer_mod) do
+        Logger.error("[lkn.core]: [Pool(#{inspect(state.map_key)})] spawns an instance that refuses to register a new puppeteer")
+        raise "New spawned instance refuses to register a new puppeteer"
+      end
 
       {add_instance(state, instance_key), instance_key}
     end
@@ -109,15 +119,21 @@ defmodule Lkn.Core.Pool.GenServer do
     {:ok, State.new(map_key)}
   end
 
-  def handle_call({:register, puppeteer_key}, _from, state) do
-    {state, instance_key} = State.find_instance(state, puppeteer_key)
+  def handle_call({:register, puppeteer_key, puppeteer_module}, _from, state) do
+    {state, instance_key} = State.find_instance(state, puppeteer_key, puppeteer_module)
     {:reply, instance_key, state}
   end
 
   def handle_cast({:kill_request, instance_key}, state) do
-    if Instance.kill(instance_key) do
-      {:noreply, State.remove_instance(state, instance_key)}
+    if State.supervise?(state, instance_key) do
+      if Instance.kill(instance_key) do
+        {:noreply, State.remove_instance(state, instance_key)}
+      else
+        {:noreply, state}
+      end
     else
+      Logger.warn("[lkn.core]: [Pool(#{inspect state.map_key})] receives a request to kill [Instance(#{inspect instance_key})] but it does not supervise it.")
+
       {:noreply, state}
     end
   end
@@ -146,9 +162,13 @@ defmodule Lkn.Core.Pool do
     GenServer.cast(Name.pool(map_key), {:kill_request, instance_key})
   end
 
-  @spec register_puppeteer(Entity.t, Puppeteer.t) :: Instance.t
-  def register_puppeteer(map_key, puppeteer_key) do
-    GenServer.call(Name.pool(map_key), {:register, puppeteer_key})
+  @spec register_puppeteer(Entity.t, Puppeteer.t, Puppeteer.m) :: Instance.t
+  def register_puppeteer(map_key, puppeteer_key, puppeteer_module) do
+    instance_key = GenServer.call(Name.pool(map_key), {:register, puppeteer_key, puppeteer_module})
+
+    Registry.register(Lkn.Core.Notifier, Name.notify_group(instance_key), puppeteer_module)
+
+    instance_key
   end
 
   @spec spawn_pool(Entity.t) :: :ok
