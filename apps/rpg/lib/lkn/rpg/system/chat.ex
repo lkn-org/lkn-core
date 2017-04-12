@@ -54,5 +54,7 @@ defmodule Lkn.Rpg.System.Chat do
         System.notify(cmd)
       end
     end
+
+    state
   end
 end

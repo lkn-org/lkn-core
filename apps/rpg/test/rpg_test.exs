@@ -68,7 +68,9 @@ defmodule RpgTest do
 
   test "spawn an instance and register our puppet" do
     puppet_key = UUID.uuid4()
-    talk_scenario(puppet_key, false, false)
+    instance_key = talk_scenario(puppet_key, false, false)
+
+    Action.talk(instance_key, puppet_key, "hi")
 
     receive do
       {:notify, {:talk, p,  x}} -> assert (p == puppet_key && x == "hi")
@@ -78,7 +80,9 @@ defmodule RpgTest do
 
   test "muted instance are silent" do
     puppet_key = UUID.uuid4()
-    talk_scenario(puppet_key, true, false)
+    instance_key = talk_scenario(puppet_key, true, false)
+
+    Action.talk(instance_key, puppet_key, "hi")
 
     receive do
       {:notify, {:talk, _p,  _x}} -> assert false
@@ -88,11 +92,31 @@ defmodule RpgTest do
 
   test "muted puppet are silent" do
     puppet_key = UUID.uuid4()
-    talk_scenario(puppet_key, false, true)
+    instance_key = talk_scenario(puppet_key, false, true)
+
+    Action.talk(instance_key, puppet_key, "hi")
 
     receive do
       {:notify, {:talk, _p,  _x}} -> assert false
       after 100 -> :ok
+    end
+  end
+
+  test "speak twice (see #18)" do
+    puppet_key = UUID.uuid4()
+    instance_key = talk_scenario(puppet_key, false, false)
+
+    Action.talk(instance_key, puppet_key, "ping")
+    Action.talk(instance_key, puppet_key, "pong")
+
+    receive do
+      {:notify, {:talk, _puppet_key,  "ping"}} -> :ok
+      after 100 -> assert false
+    end
+
+    receive do
+      {:notify, {:talk, _puppet_key,  "pong"}} -> :ok
+      after 100 -> assert false
     end
   end
 
@@ -109,6 +133,6 @@ defmodule RpgTest do
     instance_key = Test.Puppeteer.find_instance(puppeteer_key, map_key)
     Instance.register_entity(instance_key, puppet_key)
 
-    Action.talk(instance_key, puppet_key, "hi")
+    instance_key
   end
 end
