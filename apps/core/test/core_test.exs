@@ -180,6 +180,12 @@ defmodule Lkn.Core.Test do
     end
   end
 
+  setup_all do
+    Application.stop(:core)
+    Application.start(:core)
+    :ok
+  end
+
   test "spawning map" do
     map_key = UUID.uuid4()
 
