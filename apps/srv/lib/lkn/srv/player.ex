@@ -60,6 +60,15 @@ defmodule Lkn.Srv.Player do
     GenServer.cast(Name.puppeteer(puppeteer_key), {:cmd, msg})
   end
 
+  def kill(puppeteer_key) do
+    GenServer.cast(Name.puppeteer(puppeteer_key), :kill)
+  end
+
+  def handle_cast(:kill, state) do
+    Instance.unregister_entity(state.instance_key, state.puppet_key)
+    Instance.unregister_puppeteer(state.instance_key, state.puppeteer_key)
+    {:stop, :normal, state}
+  end
   def handle_cast({:cmd, msg}, state) do
     Action.talk(state.instance_key, state.puppet_key, msg)
     {:noreply, state}

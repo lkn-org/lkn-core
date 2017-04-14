@@ -36,8 +36,12 @@ defmodule Lkn.Srv.Play do
   end
 
   defp recv(puppeteer_key, client) do
-    {:text, msg} = Web.recv!(client)
-    Player.process(puppeteer_key, msg)
-    recv(puppeteer_key, client)
+    case Web.recv(client) do
+      {:ok, {:text, msg}} ->
+        Player.process(puppeteer_key, msg)
+        recv(puppeteer_key, client)
+      _ ->
+        Player.kill(puppeteer_key)
+    end
   end
 end
