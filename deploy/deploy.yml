@@ -23,47 +23,41 @@
       become: yes
       become_user: www-data
       file:
-        path: /srv/lkn
+        path: /srv/lkn/lkn
         state: directory
     - name: create docs directory if necessary
       become: yes
       become_user: www-data
       file:
-        path: /srv/lkn/docs
+        path: /srv/lkn/lkn/docs
         state: directory
     - name: create cover directory if necessary
       become: yes
       become_user: www-data
       file:
-        path: /srv/lkn/cover
+        path: /srv/lkn/lkn/cover
         state: directory
-    - name: copy index
-      become: yes
-      become_user: www-data
-      synchronize:
-        src: ../index.html
-        dest: /srv/lkn/
     - name: copy docs
-      become: yes
-      become_user: www-data
       synchronize:
+        owner: no
+        group: no
         src: ../doc/
-        dest: /srv/lkn/docs
-    - name: copy cover
-      become: yes
-      become_user: www-data
-      synchronize:
-        src: ../cover/
-        dest: /srv/lkn/cover
-    - name: create conf directory if necessary
+        dest: /srv/lkn/lkn/docs
+    - name: doc ownership
       file:
-        path: /etc/nginx/sites-enabled
-        state: directory
-    - name: push nginx configuration
-      copy:
-        src: lkn.conf
-        dest: /etc/nginx/sites-enabled/
-    - name: restart nginx
-      service:
-        name: nginx
-        state: restarted
+        path: /srv/lkn/lkn/docs
+        recurse: yes
+        owner: www-data
+        group: www-data
+    - name: copy cover
+      synchronize:
+        owner: no
+        group: no
+        src: ../cover/
+        dest: /srv/lkn/lkn/cover
+    - name: cover ownership
+      file:
+        path: /srv/lkn/lkn/cover
+        recurse: yes
+        owner: www-data
+        group: www-data
