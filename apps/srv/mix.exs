@@ -38,6 +38,7 @@ defmodule Srv.Mixfile do
       {:core, in_umbrella: true},
       {:uuid, "~> 1.1"},
       {:socket, "~> 0.3"},
+      {:poison, "~> 3.0"},
     ]
   end
 end

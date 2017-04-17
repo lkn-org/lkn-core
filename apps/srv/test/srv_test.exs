@@ -16,12 +16,12 @@ defmodule SrvTest do
 
   test "connect, speak, connect then speak" do
     client1 = Socket.connect!("ws://localhost:4000")
-    Socket.Web.send!(client1, {:text, "hi"})
+    Socket.Web.send!(client1, {:text, "{ \"type\": \"TALK\", \"content\": { \"msg\": \"hi\" } }"})
 
     {:text, _msg} = Socket.Web.recv!(client1)
 
     client2 = Socket.connect!("ws://localhost:4000")
-    Socket.Web.send!(client2, {:text, "hi"})
+    Socket.Web.send!(client2, {:text, "{ \"type\": \"TALK\", \"content\": { \"msg\": \"hi\" } }"})
 
     {:text, msg1} = Socket.Web.recv!(client1)
     {:text, msg2} = Socket.Web.recv!(client2)

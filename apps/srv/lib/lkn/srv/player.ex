@@ -8,6 +8,8 @@ defmodule Lkn.Srv.Player do
   alias Lkn.Rpg.Action
   alias Lkn.Rpg.Puppet
 
+  alias Lkn.Srv.Command
+
   alias Socket.Web
 
   require Logger
@@ -69,7 +71,7 @@ defmodule Lkn.Srv.Player do
     Instance.unregister_puppeteer(state.instance_key, state.puppeteer_key)
     {:stop, :normal, state}
   end
-  def handle_cast({:cmd, msg}, state) do
+  def handle_cast({:cmd, %Command.Talk{msg: msg}}, state) do
     Action.talk(state.instance_key, state.puppet_key, msg)
     {:noreply, state}
   end

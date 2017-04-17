@@ -7,6 +7,7 @@ defmodule Lkn.Srv.Play do
 
   alias Lkn.Srv
   alias Lkn.Srv.Player
+  alias Lkn.Srv.Command
 
   def server(port) do
     # setup the bare minimum for one map
@@ -38,7 +39,14 @@ defmodule Lkn.Srv.Play do
   defp recv(puppeteer_key, client) do
     case Web.recv(client) do
       {:ok, {:text, msg}} ->
-        Player.process(puppeteer_key, msg)
+        try do
+          cmd = Command.parse!(msg)
+          Player.process(puppeteer_key, cmd)
+        rescue
+          e in _ ->
+            Web.send!(client, {:text, "WRONG COMMAND #{inspect msg}: #{inspect e}"})
+        end
+
         recv(puppeteer_key, client)
       _ ->
         Player.kill(puppeteer_key)
