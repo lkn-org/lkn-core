@@ -8,7 +8,8 @@ defmodule Lkn.Srv.Player do
   alias Lkn.Rpg.Action
   alias Lkn.Rpg.Puppet
 
-  alias Lkn.Srv.Command
+  alias Lkn.Srv.Command, as: C
+  alias Lkn.Srv.Notification, as: N
 
   alias Socket.Web
 
@@ -71,7 +72,7 @@ defmodule Lkn.Srv.Player do
     Instance.unregister_puppeteer(state.instance_key, state.puppeteer_key)
     {:stop, :normal, state}
   end
-  def handle_cast({:cmd, %Command.Talk{msg: msg}}, state) do
+  def handle_cast({:cmd, %C.Talk{msg: msg}}, state) do
     Action.talk(state.instance_key, state.puppet_key, msg)
     {:noreply, state}
   end
@@ -85,7 +86,7 @@ defmodule Lkn.Srv.Player do
   def handle_info({:notify, {:talk, e, msg}}, state) do
     Web.send!(
       state.socket,
-      {:text, "[Entity(#{inspect e}]: #{inspect msg}"}
+      {:text, N.serialize!(N.Talk.new(e, msg))}
     )
     {:noreply, state}
   end

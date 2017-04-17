@@ -7,7 +7,8 @@ defmodule Lkn.Srv.Play do
 
   alias Lkn.Srv
   alias Lkn.Srv.Player
-  alias Lkn.Srv.Command
+  alias Lkn.Srv.Command, as: C
+  alias Lkn.Srv.Notification, as: N
 
   def server(port) do
     # setup the bare minimum for one map
@@ -40,11 +41,12 @@ defmodule Lkn.Srv.Play do
     case Web.recv(client) do
       {:ok, {:text, msg}} ->
         try do
-          cmd = Command.parse!(msg)
+          cmd = C.parse!(msg)
           Player.process(puppeteer_key, cmd)
         rescue
           e in _ ->
-            Web.send!(client, {:text, "WRONG COMMAND #{inspect msg}: #{inspect e}"})
+            n = N.serialize!(N.WrongCommand.new(msg, e))
+            Web.send!(client, {:text, n})
         end
 
         recv(puppeteer_key, client)
