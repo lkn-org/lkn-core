@@ -20,10 +20,8 @@ defmodule Lkn.Foundation.Test do
 
   doctest Lkn.Foundation.Option
   doctest Lkn.Foundation.Result
-  doctest Lkn.Foundation.Recipe
 
   use Lkn.Foundation
-  alias Lkn.Foundation.Recipe
 
   test "inside macro" do
     x = Option.some(3)
@@ -44,78 +42,6 @@ defmodule Lkn.Foundation.Test do
       assert false
     rescue
       ArgumentError -> :ok
-    end
-  end
-
-  test "recipe (periodic, duration, !duration_callback, !cancel)" do
-    {:ok, r} = Recipe.start_link(self())
-
-    r |> Recipe.set_periodic_callback(3, &(send(&1, :ping)))
-      |> Recipe.set_duration(10)
-      |> Recipe.start
-
-    wait_for(:ping, 4)
-    wait_for(:ping, 4)
-    wait_atleast(3)
-  end
-
-  test "recipe (periodic, duration, duration_callback, !cancel)" do
-    {:ok, r} = Recipe.start_link(self())
-
-    r |> Recipe.set_periodic_callback(3, &(send &1, :ping))
-      |> Recipe.set_duration(10, Option.some(&(send &1, :pong)))
-      |> Recipe.start
-
-    wait_for(:ping, 4)
-    wait_for(:ping, 4)
-    wait_for(:pong, 3)
-  end
-
-  test "recipe (!periodic, duration, duration_callback, cancel)" do
-    {:ok, r} = Recipe.start_link(self())
-
-    r |> Recipe.set_duration(10, Option.some(&(send &1, :ping)))
-      |> Recipe.set_cancel_callback(&(send &1, :pong))
-      |> Recipe.start
-
-    Recipe.cancel(r)
-    wait_for(:pong, 3)
-  end
-
-  test "recipe (!periodic, duration, duration_callback, !cancel)" do
-    {:ok, r} = Recipe.start_link(self())
-
-    r |> Recipe.set_duration(5, Option.some(&(send &1, :ping)))
-      |> Recipe.start
-
-    wait_for(:ping, 6)
-  end
-
-  test "recipe (periodic, !duration, !duration_callback, !cancel)" do
-    {:ok, r} = Recipe.start_link(self())
-
-    r |> Recipe.set_periodic_callback(3, &(send &1, :ping))
-      |> Recipe.start
-
-    wait_for(:ping, 4)
-    wait_for(:ping, 4)
-    wait_for(:ping, 4)
-    wait_for(:ping, 4)
-
-    Recipe.cancel(r)
-  end
-
-  def wait_for(msg, before) do
-    receive do
-      m -> assert (m === msg)
-    after before -> assert false
-    end
-  end
-
-  def wait_atleast(time) do
-    receive do
-      Other -> assert false
-    after time -> :ok
     end
   end
 end

@@ -42,7 +42,6 @@ defmodule Lkn.Core.Instance do
   alias Lkn.Core.Pool
   alias Lkn.Core.Puppeteer
   alias Lkn.Core.System
-  alias Lkn.Foundation.Recipe
 
   @type t :: any
 
@@ -57,7 +56,7 @@ defmodule Lkn.Core.Instance do
       :puppeteers,
     ]
 
-    @type mode :: :running|{:zombie, Option.t(Recipe.t)}
+    @type mode :: :running|{:zombie, Option.t(Beacon.t)}
 
     @type t :: %State {
       locked: boolean,
@@ -98,13 +97,12 @@ defmodule Lkn.Core.Instance do
         case Entity.read(state.map_key, :delay) do
           Option.some(delay) ->
             if !state.locked do
-              {:ok, timer} = Recipe.start_link(state.map_key)
-
-              callback = Option.some(&(Pool.kill_request(&1, state.instance_key)))
+              {:ok, timer} = Beacon.start_link(state.map_key)
 
               timer
-              |> Recipe.set_duration(delay, callback)
-              |> Recipe.start
+              |> Beacon.set_duration(delay,
+                                     &(Pool.kill_request(&1, state.instance_key)))
+              |> Beacon.enable
 
               %State{state|mode: {:zombie, Option.some(timer)}}
             else
@@ -138,7 +136,7 @@ defmodule Lkn.Core.Instance do
       state =  %State{state|puppeteers: Map.put(state.puppeteers, puppeteer_key, puppeteer_module)}
       case state.mode do
         {:zombie, Option.some(timer)} ->
-            Recipe.cancel(timer)
+            Beacon.cancel(timer)
             %State{state|mode: :running}
         _ -> state
       end

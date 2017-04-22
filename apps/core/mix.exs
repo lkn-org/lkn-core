@@ -32,6 +32,7 @@ defmodule Lkn.Core.Mixfile do
     [
       {:foundation, in_umbrella: true},
       {:uuid, "~> 1.1"},
+      {:beacon, "~> 1.0"},
     ]
   end
 end
