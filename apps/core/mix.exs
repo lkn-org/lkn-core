@@ -32,7 +32,7 @@ defmodule Lkn.Core.Mixfile do
     [
       {:uuid, "~> 1.1"},
       {:beacon, "~> 1.0"},
-      {:lkn_prelude, "~> 0.1"},
+      {:lkn_prelude, "~> 0.1.1"},
     ]
   end
 end
