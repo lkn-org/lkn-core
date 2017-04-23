@@ -35,7 +35,7 @@ defmodule Lkn.Core.Instance.Supervisor do
 end
 
 defmodule Lkn.Core.Instance do
-  use Lkn.Foundation
+  use Lkn.Prelude
 
   alias Lkn.Core.Entity
   alias Lkn.Core.Name
@@ -110,13 +110,13 @@ defmodule Lkn.Core.Instance do
               # there is no need to wait.
               Pool.kill_request(state.map_key, state.instance_key)
 
-              %State{state|mode: {:zombie, Option.none()}}
+              %State{state|mode: {:zombie, Option.nothing()}}
             end
-          Option.none() ->
+          Option.nothing() ->
             # there is no specified delay, so we can die right now
             Pool.kill_request(state.map_key, state.instance_key)
 
-            %State{state|mode: {:zombie, Option.none()}}
+            %State{state|mode: {:zombie, Option.nothing()}}
         end
       else
         state
@@ -127,7 +127,7 @@ defmodule Lkn.Core.Instance do
     def closed?(state) do
       state.locked || case Entity.read(state.map_key, :limit) do
                         Option.some(limit) -> Map.size(state.puppeteers) == limit
-                        Option.none() -> false
+                        Option.nothing() -> false
                       end
     end
 

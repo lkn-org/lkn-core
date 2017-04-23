@@ -1,6 +1,4 @@
 defmodule Lkn.Srv.Command do
-  use Lkn.Foundation
-
   alias Poison.Parser
 
   @type m :: module

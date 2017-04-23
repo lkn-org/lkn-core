@@ -30,9 +30,9 @@ defmodule Lkn.Core.Mixfile do
 
   defp deps do
     [
-      {:foundation, in_umbrella: true},
       {:uuid, "~> 1.1"},
       {:beacon, "~> 1.0"},
+      {:lkn_prelude, "~> 0.1"},
     ]
   end
 end

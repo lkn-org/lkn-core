@@ -1,5 +1,5 @@
 defmodule Lkn.Rpg.Puppet do
-  use Lkn.Foundation
+  use Lkn.Prelude
 
   alias Lkn.Core.Component
   alias Lkn.Core.Entity

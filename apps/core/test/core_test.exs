@@ -21,7 +21,7 @@ defmodule Lkn.Core.Test do
   doctest Lkn.Core.Component
   doctest Lkn.Core.Entity
 
-  use Lkn.Foundation
+  use Lkn.Prelude
 
   alias Lkn.Core.Component
   alias Lkn.Core.Instance
@@ -139,7 +139,7 @@ defmodule Lkn.Core.Test do
       case delay do
         Option.some(delay) ->
           %{:delay => delay, :limit => 2}
-        Option.none() ->
+        Option.nothing() ->
           %{:limit => 2}
       end
     end
@@ -368,7 +368,7 @@ defmodule Lkn.Core.Test do
 
     {:ok, _} = Test.Puppeteer.start_link(puppeteer_key)
 
-    {:ok, _} = Test.Map.start_link(map_key, Option.none())
+    {:ok, _} = Test.Map.start_link(map_key, Option.nothing())
     :ok = Lkn.Core.Pool.spawn_pool(map_key)
 
     instance_key = Test.Puppeteer.find_instance(puppeteer_key, map_key)

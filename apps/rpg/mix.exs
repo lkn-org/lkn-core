@@ -23,8 +23,8 @@ defmodule Rpg.Mixfile do
 
   defp deps do
     [
-      {:foundation, in_umbrella: true},
       {:core, in_umbrella: true},
+      {:lkn_prelude, "~> 0.1"},
       {:uuid, "~> 1.1"},
     ]
   end

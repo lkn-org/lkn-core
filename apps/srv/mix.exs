@@ -34,8 +34,8 @@ defmodule Srv.Mixfile do
   defp deps do
     [
       {:rpg, in_umbrella: true},
-      {:foundation, in_umbrella: true},
       {:core, in_umbrella: true},
+      {:lkn_prelude, "~> 0.1"},
       {:uuid, "~> 1.1"},
       {:socket, "~> 0.3"},
       {:poison, "~> 3.0"},

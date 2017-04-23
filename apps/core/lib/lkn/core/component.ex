@@ -27,7 +27,8 @@ defmodule Lkn.Core.Component do
   defmacro __using__(sys: sys, type: type) do
     quote location: :keep do
       use GenServer
-      use Lkn.Foundation
+
+      use Lkn.Prelude
 
       @behaviour unquote(sys).component(unquote(type))
 

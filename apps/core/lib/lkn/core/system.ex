@@ -20,7 +20,7 @@ defmodule Lkn.Core.System do
   A behaviour module for implementing a System.
   """
 
-  use Lkn.Foundation
+  use Lkn.Prelude
 
   alias Lkn.Core.Entity
   alias Lkn.Core.Name
@@ -91,7 +91,7 @@ defmodule Lkn.Core.System do
     quote location: :keep do
       require Logger
 
-      use Lkn.Foundation
+      use Lkn.Prelude
 
       use GenServer
       @type state :: unquote(state_t)

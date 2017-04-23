@@ -42,7 +42,7 @@ defmodule Lkn.Core.Entity.Components do
 end
 
 defmodule Lkn.Core.Entity do
-  use Lkn.Foundation
+  use Lkn.Prelude
 
   alias Lkn.Core.Name
   alias Lkn.Core.Properties
@@ -89,7 +89,7 @@ defmodule Lkn.Core.Entity do
 
     case r do
       {:ok, t} -> Option.some(t)
-      _ -> Option.none()
+      _ -> Option.nothing()
     end
   end
 

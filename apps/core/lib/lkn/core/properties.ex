@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 defmodule Lkn.Core.Properties do
-  use Lkn.Foundation
+  use Lkn.Prelude
 
   @moduledoc """
   Underlying properties of an `Lkn.Entity`.
@@ -40,7 +40,7 @@ defmodule Lkn.Core.Properties do
   def read(entity_key, prop) do
     case Agent.get(Lkn.Core.Name.properties(entity_key), &Map.fetch(&1, prop)) do
       {:ok, val} -> Option.some(val)
-      :error -> Option.none()
+      :error -> Option.nothing()
     end
   end
 
