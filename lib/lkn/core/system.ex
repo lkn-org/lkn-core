@@ -42,11 +42,11 @@ defmodule Lkn.Core.System do
     @type t :: %State{
       map_key: Entity.t,
       map_comp: module,
-      instance_key: Instance.t,
+      instance_key: Instance.k,
       entities: System.entities,
     }
 
-    @spec new(Instance.t, term, module) :: t
+    @spec new(Instance.k, term, module) :: t
     def new(instance_key, map_key, map_comp) do
       %State{
         entities: Map.new(),
@@ -236,7 +236,7 @@ defmodule Lkn.Core.System do
     GenServer.cast(self(), {:priv, {:notify, notification}})
   end
 
-  @spec population_size(Instance.t, module) :: integer
+  @spec population_size(Instance.k, module) :: integer
   def population_size(instance_key, system) do
     GenServer.call(Name.system(instance_key, system), {:priv, :population_size})
   end

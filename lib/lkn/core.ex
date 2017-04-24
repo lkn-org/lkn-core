@@ -45,17 +45,17 @@ defmodule Lkn.Core do
       {:via, Registry, {Lkn.Core.Registry, {:entity, entity_key}}}
     end
 
-    @spec system(Instance.t, System.m) :: t
+    @spec system(Instance.k, System.m) :: t
     def system(instance_key, sys) do
       {:via, Registry, {Lkn.Core.Registry, {:engine, instance_key, sys}}}
     end
 
-    @spec notify_group(Instance.t) :: t
+    @spec notify_group(Instance.k) :: t
     def notify_group(instance_key) do
       {:via, Registry, {Lkn.Core.Notifier, {:engine, instance_key, :notifier}}}
     end
 
-    @spec instance(Instance.t) :: t
+    @spec instance(Instance.k) :: t
     def instance(instance_key) do
       {:via, Registry, {Lkn.Core.Registry, {:instance, instance_key}}}
     end

@@ -53,8 +53,8 @@ defmodule Lkn.Core.Puppeteer do
         ]
 
         @type t :: %State{
-          puppeteer_key: Puppeteer.t,
-          instance_key:  Lkn.Prelude.Option.t(Instance.t),
+          puppeteer_key: Puppeteer.k,
+          instance_key:  Lkn.Prelude.Option.t(Instance.k),
           map_key:       Lkn.Prelude.Option.t(Entity.t),
           state:         unquote(state_t),
         }
@@ -113,14 +113,14 @@ defmodule Lkn.Core.Puppeteer do
 
   @callback handle_message(state, any) :: state
   @callback init_state(init_args) :: {:ok, state}|:error
-  @callback leave_instance(state, Instance.t) :: state
+  @callback leave_instance(state, Instance.k) :: state
 
-  @spec leave_instance(k, Instance.t) :: :ok
+  @spec leave_instance(k, Instance.k) :: :ok
   def leave_instance(puppeteer_key, instance_key) do
     GenServer.cast(Name.puppeteer(puppeteer_key), {:leave_instance, instance_key})
   end
 
-  @spec find_instance(k, Entity.t) :: Instance.t
+  @spec find_instance(k, Entity.t) :: Instance.k
   def find_instance(puppeteer_key, map_key) do
     GenServer.call(Name.puppeteer(puppeteer_key), {:find_instance, map_key})
   end

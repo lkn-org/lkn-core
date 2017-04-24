@@ -43,7 +43,10 @@ defmodule Lkn.Core.Instance do
   alias Lkn.Core.Puppeteer
   alias Lkn.Core.System
 
-  @type t :: any
+  @typedoc """
+  A key to identify and reach an Instance.
+  """
+  @type k :: any
 
   defmodule State do
     @moduledoc false
@@ -62,11 +65,11 @@ defmodule Lkn.Core.Instance do
       locked: boolean,
       mode: mode,
       map_key: Entity.t,
-      instance_key: Instance.t,
+      instance_key: Instance.k,
       puppeteers: %{Puppeteer.k => Puppeteer.m},
     }
 
-    @spec new(Entity.t, Instance.t) :: t
+    @spec new(Entity.t, Instance.k) :: t
     def new(map_key, instance_key) do
       %State{
         locked:     false,
@@ -152,11 +155,12 @@ defmodule Lkn.Core.Instance do
   use GenServer
 
   @doc false
-  @spec start_link(Entity.t, t) :: GenServer.on_start
+  @spec start_link(Entity.t, k) :: GenServer.on_start
   def start_link(map_key, instance_key) do
     GenServer.start_link(__MODULE__, [map: map_key, instance: instance_key], name: Name.instance(instance_key))
   end
 
+  @spec spawn_instance(Entity.t, k) :: Supervisor.on_start
   def spawn_instance(map_key, instance_key) do
     Supervisor.start_child(Name.instance_sup(map_key), [instance_key])
   end
@@ -171,7 +175,7 @@ defmodule Lkn.Core.Instance do
     {:ok, State.new(map_key, instance_key)}
   end
 
-  @spec register_entity(t, Entity.t) :: :ok
+  @spec register_entity(k, Entity.t) :: :ok
   def register_entity(instance_key, entity_key) do
     sys_map = Entity.systems(entity_key)
 
@@ -186,7 +190,7 @@ defmodule Lkn.Core.Instance do
     :ok
   end
 
-  @spec unregister_entity(t, Entity.t) :: :ok
+  @spec unregister_entity(k, Entity.t) :: :ok
   def unregister_entity(instance_key, entity_key) do
     sys_map = Entity.systems(entity_key)
 
@@ -202,7 +206,7 @@ defmodule Lkn.Core.Instance do
   end
 
   @doc false
-  @spec register_puppeteer(t, Puppeteer.k, Puppeteer.m) :: boolean
+  @spec register_puppeteer(k, Puppeteer.k, Puppeteer.m) :: boolean
   def register_puppeteer(instance_key, puppeteer_key, puppeteer_module) do
     GenServer.call(Name.instance(instance_key), {:register_puppeteer, puppeteer_key, puppeteer_module})
   end
@@ -210,7 +214,7 @@ defmodule Lkn.Core.Instance do
   @doc """
   After `lock/1` returns, the Instance refuses to register new puppeteers.
   """
-  @spec lock(t) :: :ok
+  @spec lock(k) :: :ok
   def lock(instance_key) do
     GenServer.call(Name.instance(instance_key), :lock)
     :ok
@@ -222,18 +226,18 @@ defmodule Lkn.Core.Instance do
   If `lock/1` has been called before, the Instance should quickly
   exit.
   """
-  @spec kick_all(t) :: :ok
+  @spec kick_all(k) :: :ok
   def kick_all(instance_key) do
     GenServer.cast(Name.instance(instance_key), :kick_all)
   end
 
   @doc false
-  @spec kill(t) :: boolean
+  @spec kill(k) :: boolean
   def kill(instance_key) do
     GenServer.call(Name.instance(instance_key), :killme)
   end
 
-  @spec unregister_puppeteer(t, Puppeteer.k) :: :ok
+  @spec unregister_puppeteer(k, Puppeteer.k) :: :ok
   def unregister_puppeteer(instance_key, puppeteer_key) do
     GenServer.cast(Name.instance(instance_key), {:unregister_puppeteer, puppeteer_key})
 
