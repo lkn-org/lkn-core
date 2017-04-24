@@ -15,170 +15,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+
+use Lkn.Prelude
+
+alias Lkn.Core.Component
+alias Lkn.Core.Instance
+alias Lkn.Core.Puppeteer
+
+require Lkn.Core.Component
+
 defmodule Lkn.Core.Test do
   use ExUnit.Case, async: false
-  doctest Lkn.Core.System
-  doctest Lkn.Core.Component
-  doctest Lkn.Core.Entity
-
-  use Lkn.Prelude
-
-  alias Lkn.Core.Component
-  alias Lkn.Core.Instance
-  alias Lkn.Core.Name
-  alias Lkn.Core.Puppeteer
-
-  require Lkn.Core.Component
-
-
-  defmodule Test.Puppeteer do
-    @behaviour Puppeteer
-
-    use GenServer
-
-    def start_link(puppeteer_key) do
-      GenServer.start_link(__MODULE__, {puppeteer_key, self()}, name: Name.puppeteer(puppeteer_key))
-    end
-
-    def init(s) do
-      {:ok, s}
-    end
-
-    def force_unregister(puppeteer_key, from: instance_key) do
-      GenServer.cast(Name.puppeteer(puppeteer_key), {:force_unregister, instance_key})
-    end
-
-    def find_instance(puppeteer_key, map_key) do
-      GenServer.call(Name.puppeteer(puppeteer_key), {:find_instance, map_key})
-    end
-
-    def leave_instance(puppeteer_key, instance_key) do
-      GenServer.cast(Name.puppeteer(puppeteer_key), {:leave_instance, instance_key})
-    end
-
-    def handle_info(msg, state = {_pk, target}) do
-      send(target, msg)
-
-      {:noreply, state}
-    end
-
-    def handle_call({:find_instance, map_key}, _from, state = {pk, _target}) do
-      {:reply, Lkn.Core.Pool.register_puppeteer(map_key, pk, __MODULE__), state}
-    end
-
-    def handle_cast({:force_unregister, instance}, state = {pk, target}) do
-      send(target, :kick)
-      leave_instance(pk, instance)
-
-      {:noreply, state}
-    end
-    def handle_cast({:leave_instance, instance_key}, state = {pk, _target}) do
-      Lkn.Core.Instance.unregister_puppeteer(instance_key, pk)
-
-      {:noreply, state}
-    end
-  end
-
-  defmodule Test.System do
-    defmodule Component do
-      @callback level_up(key :: any) :: {:level_up, key :: Entity.t, old :: integer, new :: integer}
-    end
-
-    defmodule Map do
-      @callback level_max :: integer
-    end
-
-    use Lkn.Core.System,
-      state: :ok,
-      puppet_component: Component,
-      map_component: Map
-
-    def init_state(_map_key, _comp) do
-      :ok
-    end
-
-    def start_link(instance_key, map_key) do
-      Lkn.Core.System.start_link(__MODULE__, instance_key, map_key)
-    end
-
-    def entity_enter(:ok, _entities, key) do
-      Lkn.Core.System.notify({:enter, key})
-      :ok
-    end
-
-    def entity_leave(:ok, _entities, key) do
-      Lkn.Core.System.notify({:leave, key})
-      :ok
-    end
-
-    def system_cast({:level_up, entity_key}, entities, state) do
-      notif = comp(entities, entity_key).level_up(entity_key)
-      Lkn.Core.System.notify(notif)
-      state
-    end
-
-    def level_up(key, entity_key) do
-      cast(key, {:level_up, entity_key})
-    end
-  end
-
-  defmodule Test.Map.Component do
-    Component.mapify for: Test.System
-
-    def level_max, do: 7
-  end
-
-  defmodule Test.Map do
-    use Lkn.Core.Entity, components: [Test.Map.Component]
-
-    def start_link(key, delay \\ Option.some(100)) do
-      Lkn.Core.Entity.start_link(__MODULE__, key, delay)
-    end
-
-    def init_properties(delay) do
-      case delay do
-        Option.some(delay) ->
-          %{:delay => delay, :limit => 2}
-        Option.nothing() ->
-          %{:limit => 2}
-      end
-    end
-  end
-
-  defmodule Test.Entity.Component do
-    Component.puppetify for: Test.System
-
-    def level_up(entity_key) do
-      Option.some(lvl) = read(entity_key, :level)
-      write(entity_key, :level, lvl + 1)
-
-      {:level_up, lvl, lvl + 1}
-    end
-  end
-
-  defmodule Test.Entity do
-    use Lkn.Core.Entity, components: [Test.Entity.Component]
-
-    def start_link(key, args = [name: _name, level: _level]) do
-      Lkn.Core.Entity.start_link(__MODULE__, key, args)
-    end
-
-    def init_properties(name: name, level: level) do
-      %{:name => name, :level => level}
-    end
-  end
-
-  defmodule Test.Ghost do
-    use Lkn.Core.Entity, components: []
-
-    def start_link(key) do
-      Lkn.Core.Entity.start_link(__MODULE__, key, [])
-    end
-
-    def init_properties([]) do
-      %{:name => "ghost", :level => 0}
-    end
-  end
 
   setup_all do
     Application.stop(:core)
@@ -231,7 +78,7 @@ defmodule Lkn.Core.Test do
     {:ok, _} = Test.Map.start_link(map_key)
     :ok = Lkn.Core.Pool.spawn_pool(map_key)
 
-    instance_key = Test.Puppeteer.find_instance(puppeteer_key, map_key)
+    instance_key = Puppeteer.find_instance(puppeteer_key, map_key)
 
     entity_key = UUID.uuid4()
     ghost_key = UUID.uuid4()
@@ -274,7 +121,7 @@ defmodule Lkn.Core.Test do
     {:ok, _} = Test.Map.start_link(map_key)
     :ok = Lkn.Core.Pool.spawn_pool(map_key)
 
-    instance_key = Test.Puppeteer.find_instance(puppeteer_key, map_key)
+    instance_key = Puppeteer.find_instance(puppeteer_key, map_key)
 
     entity_key = UUID.uuid4()
 
@@ -304,17 +151,17 @@ defmodule Lkn.Core.Test do
     {:ok, _} = Test.Map.start_link(map_key)
     :ok = Lkn.Core.Pool.spawn_pool(map_key)
 
-    instance_key = Test.Puppeteer.find_instance(puppeteer_key, map_key)
+    instance_key = Puppeteer.find_instance(puppeteer_key, map_key)
 
-    Test.Puppeteer.leave_instance(puppeteer_key, instance_key)
+    Puppeteer.leave_instance(puppeteer_key, instance_key)
     Process.sleep(10)
-    instance_key2 = Test.Puppeteer.find_instance(puppeteer_key, map_key)
+    instance_key2 = Puppeteer.find_instance(puppeteer_key, map_key)
 
     assert(instance_key2 == instance_key)
 
-    Test.Puppeteer.leave_instance(puppeteer_key, instance_key)
+    Puppeteer.leave_instance(puppeteer_key, instance_key)
     Process.sleep(110)
-    instance_key2 = Test.Puppeteer.find_instance(puppeteer_key, map_key)
+    instance_key2 = Puppeteer.find_instance(puppeteer_key, map_key)
 
     assert(instance_key2 != instance_key)
   end
@@ -332,12 +179,12 @@ defmodule Lkn.Core.Test do
     {:ok, _} = Test.Map.start_link(map_key)
     :ok = Lkn.Core.Pool.spawn_pool(map_key)
 
-    instance_key1 = Test.Puppeteer.find_instance(puppeteer_key1, map_key)
-    instance_key2 = Test.Puppeteer.find_instance(puppeteer_key2, map_key)
+    instance_key1 = Puppeteer.find_instance(puppeteer_key1, map_key)
+    instance_key2 = Puppeteer.find_instance(puppeteer_key2, map_key)
 
     assert(instance_key2 == instance_key1)
 
-    instance_key3 = Test.Puppeteer.find_instance(puppeteer_key3, map_key)
+    instance_key3 = Puppeteer.find_instance(puppeteer_key3, map_key)
 
     assert(instance_key3 != instance_key1)
   end
@@ -353,11 +200,11 @@ defmodule Lkn.Core.Test do
     {:ok, _} = Test.Puppeteer.start_link(puppeteer_key1)
     {:ok, _} = Test.Puppeteer.start_link(puppeteer_key2)
 
-    instance_key1 = Test.Puppeteer.find_instance(puppeteer_key1, map_key)
+    instance_key1 = Puppeteer.find_instance(puppeteer_key1, map_key)
 
     Instance.lock(instance_key1)
 
-    instance_key2 = Test.Puppeteer.find_instance(puppeteer_key2, map_key)
+    instance_key2 = Puppeteer.find_instance(puppeteer_key2, map_key)
 
     assert(instance_key1 != instance_key2)
   end
@@ -371,12 +218,12 @@ defmodule Lkn.Core.Test do
     {:ok, _} = Test.Map.start_link(map_key, Option.nothing())
     :ok = Lkn.Core.Pool.spawn_pool(map_key)
 
-    instance_key = Test.Puppeteer.find_instance(puppeteer_key, map_key)
-    Test.Puppeteer.leave_instance(puppeteer_key, instance_key)
+    instance_key = Puppeteer.find_instance(puppeteer_key, map_key)
+    Puppeteer.leave_instance(puppeteer_key, instance_key)
 
     Process.sleep(10)
 
-    instance_key2 = Test.Puppeteer.find_instance(puppeteer_key, map_key)
+    instance_key2 = Puppeteer.find_instance(puppeteer_key, map_key)
 
     assert(instance_key2 != instance_key)
   end
@@ -390,14 +237,14 @@ defmodule Lkn.Core.Test do
     {:ok, _} = Test.Map.start_link(map_key)
     :ok = Lkn.Core.Pool.spawn_pool(map_key)
 
-    instance_key = Test.Puppeteer.find_instance(puppeteer_key, map_key)
+    instance_key = Puppeteer.find_instance(puppeteer_key, map_key)
 
     [{pid, _}] = Registry.lookup(Lkn.Core.Registry, {:instance, instance_key})
     Process.monitor(pid)
 
     Instance.lock(instance_key)
 
-    Test.Puppeteer.leave_instance(puppeteer_key, instance_key)
+    Puppeteer.leave_instance(puppeteer_key, instance_key)
 
     receive do
       {:DOWN, _, _, _, _} -> :ok
@@ -414,7 +261,7 @@ defmodule Lkn.Core.Test do
     {:ok, _} = Test.Map.start_link(map_key)
     :ok = Lkn.Core.Pool.spawn_pool(map_key)
 
-    instance_key = Test.Puppeteer.find_instance(puppeteer_key, map_key)
+    instance_key = Puppeteer.find_instance(puppeteer_key, map_key)
 
     [{pid, _}] = Registry.lookup(Lkn.Core.Registry, {:instance, instance_key})
     Process.monitor(pid)
@@ -431,5 +278,140 @@ defmodule Lkn.Core.Test do
       {:DOWN, _, _, _, _} -> :ok
       after 100 -> assert false
     end
+  end
+end
+
+######################################################################
+#                              SYSTEM                                #
+#                                                                    #
+defmodule Test.System do
+  defmodule Component do
+    @callback level_up(key :: any) :: {:level_up, key :: Entity.t, old :: integer, new :: integer}
+  end
+
+  defmodule Map do
+    @callback level_max :: integer
+  end
+
+  use Lkn.Core.System,
+    state: :ok,
+    puppet_component: Component,
+    map_component: Map
+
+  def init_state(_map_key, _comp) do
+    :ok
+  end
+
+  def start_link(instance_key, map_key) do
+    Lkn.Core.System.start_link(__MODULE__, instance_key, map_key)
+  end
+
+  def entity_enter(:ok, _entities, key) do
+    Lkn.Core.System.notify({:enter, key})
+    :ok
+  end
+
+  def entity_leave(:ok, _entities, key) do
+    Lkn.Core.System.notify({:leave, key})
+    :ok
+  end
+
+  def system_cast({:level_up, entity_key}, entities, state) do
+    notif = comp(entities, entity_key).level_up(entity_key)
+    Lkn.Core.System.notify(notif)
+    state
+  end
+
+  def level_up(key, entity_key) do
+    cast(key, {:level_up, entity_key})
+  end
+end
+
+######################################################################
+#                                MAP                                 #
+#                                                                    #
+defmodule Test.Map.Component do
+  Component.mapify for: Test.System
+
+  def level_max, do: 7
+end
+
+defmodule Test.Map do
+  use Lkn.Core.Entity, components: [Test.Map.Component]
+
+  def start_link(key, delay \\ Option.some(100)) do
+    Lkn.Core.Entity.start_link(__MODULE__, key, delay)
+  end
+
+  def init_properties(delay) do
+    case delay do
+      Option.some(delay) ->
+        %{:delay => delay, :limit => 2}
+      Option.nothing() ->
+        %{:limit => 2}
+    end
+  end
+end
+
+######################################################################
+#                              ENTITY                                #
+#                                                                    #
+defmodule Test.Entity.Component do
+  Component.puppetify for: Test.System
+
+  def level_up(entity_key) do
+    Option.some(lvl) = read(entity_key, :level)
+    write(entity_key, :level, lvl + 1)
+
+    {:level_up, lvl, lvl + 1}
+  end
+end
+
+defmodule Test.Entity do
+  use Lkn.Core.Entity, components: [Test.Entity.Component]
+
+  def start_link(key, args = [name: _name, level: _level]) do
+    Lkn.Core.Entity.start_link(__MODULE__, key, args)
+  end
+
+  def init_properties(name: name, level: level) do
+    %{:name => name, :level => level}
+  end
+end
+
+defmodule Test.Ghost do
+  use Lkn.Core.Entity, components: []
+
+  def start_link(key) do
+    Lkn.Core.Entity.start_link(__MODULE__, key, [])
+  end
+
+  def init_properties([]) do
+    %{:name => "ghost", :level => 0}
+  end
+end
+
+######################################################################
+#                             PUPPETEER                              #
+#                                                                    #
+defmodule Test.Puppeteer do
+  use Puppeteer, state: pid()
+
+  def start_link(puppeteer_key) do
+    Puppeteer.start_link(__MODULE__, puppeteer_key, self())
+  end
+
+  def init_state(s) do
+    {:ok, s}
+  end
+
+  def leave_instance(target, _instance_key) do
+    send(target, :kick)
+    target
+  end
+
+  def handle_message(target, msg) do
+    send(target, msg)
+    target
   end
 end

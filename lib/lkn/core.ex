@@ -60,7 +60,7 @@ defmodule Lkn.Core do
       {:via, Registry, {Lkn.Core.Registry, {:instance, instance_key}}}
     end
 
-    @spec puppeteer(Puppeteer.t) :: t
+    @spec puppeteer(Puppeteer.k) :: t
     def puppeteer(puppeteer_key) do
       {:via, Registry, {Lkn.Core.Registry, {:puppeteer, puppeteer_key}}}
     end
@@ -161,8 +161,8 @@ defmodule Lkn.Core do
   :ignore
   def init(_) do
     children = [
-      supervisor(Registry, [:unique, Lkn.Core.Registry], id: :ecs_registry),
-      supervisor(Registry, [:duplicate, Lkn.Core.Notifier], id: :ecs_notifier),
+      supervisor(Registry, [:unique, Lkn.Core.Registry], id: :core_registry),
+      supervisor(Registry, [:duplicate, Lkn.Core.Notifier], id: :core_notifier),
       supervisor(Lkn.Core.Pool.Supervisor, [])
     ]
 

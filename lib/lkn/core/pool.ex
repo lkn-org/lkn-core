@@ -85,12 +85,12 @@ defmodule Lkn.Core.Pool.GenServer do
       %State{state|instances: List.delete(state.instances, instance_key)}
     end
 
-    @spec find_instance(t, Puppeteer.t, Puppeteer.m) :: {t, Instance.t}
+    @spec find_instance(t, Puppeteer.k, Puppeteer.m) :: {t, Instance.t}
     def find_instance(state, puppeteer_key, puppeteer_mod) do
       find_instance_or_spawn(state, state.instances, puppeteer_key, puppeteer_mod)
     end
 
-    @spec find_instance_or_spawn(t, [Instance.t], Puppeteer.t, Puppeteer.m) :: {t, Instance.t}
+    @spec find_instance_or_spawn(t, [Instance.t], Puppeteer.k, Puppeteer.m) :: {t, Instance.t}
     defp find_instance_or_spawn(state, [instance_key|instances], puppeteer_key, puppeteer_mod) do
       if Instance.register_puppeteer(instance_key, puppeteer_key, puppeteer_mod) do
         {state, instance_key}
@@ -162,7 +162,7 @@ defmodule Lkn.Core.Pool do
     GenServer.cast(Name.pool(map_key), {:kill_request, instance_key})
   end
 
-  @spec register_puppeteer(Entity.t, Puppeteer.t, Puppeteer.m) :: Instance.t
+  @spec register_puppeteer(Entity.t, Puppeteer.k, Puppeteer.m) :: Instance.t
   def register_puppeteer(map_key, puppeteer_key, puppeteer_module) do
     instance_key = GenServer.call(Name.pool(map_key), {:register, puppeteer_key, puppeteer_module})
 

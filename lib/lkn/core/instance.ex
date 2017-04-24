@@ -63,7 +63,7 @@ defmodule Lkn.Core.Instance do
       mode: mode,
       map_key: Entity.t,
       instance_key: Instance.t,
-      puppeteers: %{Puppeteer.t => Puppeteer.m},
+      puppeteers: %{Puppeteer.k => Puppeteer.m},
     }
 
     @spec new(Entity.t, Instance.t) :: t
@@ -84,8 +84,8 @@ defmodule Lkn.Core.Instance do
 
     @spec kick_all(t) :: :ok
     def kick_all(state) do
-      Enum.map(state.puppeteers, fn {key, mod} ->
-        mod.force_unregister(key, from: state.instance_key)
+      Enum.map(state.puppeteers, fn {key, _mod} ->
+        Lkn.Core.Puppeteer.leave_instance(key, state.instance_key)
       end)
 
       :ok
@@ -131,7 +131,7 @@ defmodule Lkn.Core.Instance do
                       end
     end
 
-    @spec register_puppeteer(t, Puppeteer.t, Puppeteer.m) :: t
+    @spec register_puppeteer(t, Puppeteer.k, Puppeteer.m) :: t
     def register_puppeteer(state, puppeteer_key, puppeteer_module) do
       state =  %State{state|puppeteers: Map.put(state.puppeteers, puppeteer_key, puppeteer_module)}
       case state.mode do
@@ -142,7 +142,7 @@ defmodule Lkn.Core.Instance do
       end
     end
 
-    @spec unregister_puppeteer(t, Puppeteer.t) :: t
+    @spec unregister_puppeteer(t, Puppeteer.k) :: t
     def unregister_puppeteer(state, puppeteer_key) do
       %State{state|puppeteers: Map.delete(state.puppeteers, puppeteer_key)}
       |> zombify
@@ -202,7 +202,7 @@ defmodule Lkn.Core.Instance do
   end
 
   @doc false
-  @spec register_puppeteer(t, Puppeteer.t, Puppeteer.m) :: boolean
+  @spec register_puppeteer(t, Puppeteer.k, Puppeteer.m) :: boolean
   def register_puppeteer(instance_key, puppeteer_key, puppeteer_module) do
     GenServer.call(Name.instance(instance_key), {:register_puppeteer, puppeteer_key, puppeteer_module})
   end
@@ -233,7 +233,7 @@ defmodule Lkn.Core.Instance do
     GenServer.call(Name.instance(instance_key), :killme)
   end
 
-  @spec unregister_puppeteer(t, Puppeteer.t) :: :ok
+  @spec unregister_puppeteer(t, Puppeteer.k) :: :ok
   def unregister_puppeteer(instance_key, puppeteer_key) do
     GenServer.cast(Name.instance(instance_key), {:unregister_puppeteer, puppeteer_key})
 
