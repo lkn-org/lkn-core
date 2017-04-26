@@ -168,8 +168,8 @@ defmodule Lkn.Core.Instance do
   def init(map: map_key, instance: instance_key) do
     sys_map = Entity.systems(map_key)
 
-    _ = Enum.map(sys_map, fn {sys, comp} ->
-      {:ok, _} = System.start_link(sys, instance_key, map_key, comp)
+    _ = Enum.map(sys_map, fn sys ->
+      {:ok, _} = System.start_link(sys, instance_key, map_key)
     end)
 
     {:ok, State.new(map_key, instance_key)}
@@ -179,7 +179,7 @@ defmodule Lkn.Core.Instance do
   def register_entity(instance_key, entity_key) do
     sys_map = Entity.systems(entity_key)
 
-    _ = Enum.map(sys_map, fn {sys, _} ->
+    _ = Enum.map(sys_map, fn sys ->
       try do
         Lkn.Core.System.register_entity(instance_key, sys, entity_key)
       rescue
@@ -194,7 +194,7 @@ defmodule Lkn.Core.Instance do
   def unregister_entity(instance_key, entity_key) do
     sys_map = Entity.systems(entity_key)
 
-    _ = Enum.map(sys_map, fn {sys, _} ->
+    _ = Enum.map(sys_map, fn sys ->
       try do
         Lkn.Core.System.unregister_entity(instance_key, sys, entity_key)
       rescue

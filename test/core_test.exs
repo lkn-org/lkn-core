@@ -18,7 +18,6 @@
 
 use Lkn.Prelude
 
-alias Lkn.Core.Component
 alias Lkn.Core.Instance
 alias Lkn.Core.Puppeteer
 
@@ -137,7 +136,7 @@ defmodule Lkn.Core.Test do
     end
 
     receive do
-      {:notify, {:level_up, 4, 5}} -> :ok
+      {:notify, {:level_up, {4, 5}}} -> :ok
       after 100 -> assert false
     end
   end
@@ -284,21 +283,34 @@ end
 ######################################################################
 #                              SYSTEM                                #
 #                                                                    #
+
+import Lkn.Core.Component
+
+defspecs Test.System.Puppet do
+  @system Test.System
+
+  @doc """
+  Test
+  """
+  @call level_up() :: {number, number}
+end
+
+defspecs Test.System.Map do
+  @system Test.System
+
+  @doc """
+  Test
+  """
+  @call level_max() :: number
+end
+
 defmodule Test.System do
-  defmodule Component do
-    @callback level_up(key :: any) :: {:level_up, key :: Entity.t, old :: integer, new :: integer}
-  end
-
-  defmodule Map do
-    @callback level_max :: integer
-  end
-
   use Lkn.Core.System,
     state: :ok,
-    puppet_component: Component,
-    map_component: Map
+    puppet_component: Test.System.Component,
+    map_component: Test.System.Map
 
-  def init_state(_map_key, _comp) do
+  def init_state(_map_key) do
     :ok
   end
 
@@ -316,9 +328,9 @@ defmodule Test.System do
     :ok
   end
 
-  def system_cast({:level_up, entity_key}, entities, state) do
-    notif = comp(entities, entity_key).level_up(entity_key)
-    Lkn.Core.System.notify(notif)
+  def system_cast({:level_up, entity_key}, _entities, state) do
+    notif = Test.System.Puppet.level_up(entity_key)
+    Lkn.Core.System.notify({:level_up, notif})
     state
   end
 
@@ -331,9 +343,9 @@ end
 #                                MAP                                 #
 #                                                                    #
 defmodule Test.Map.Component do
-  Component.mapify for: Test.System
+  use Test.System.Map
 
-  def level_max, do: 7
+  def level_max(_), do: 7
 end
 
 defmodule Test.Map do
@@ -357,13 +369,14 @@ end
 #                              ENTITY                                #
 #                                                                    #
 defmodule Test.Entity.Component do
-  Component.puppetify for: Test.System
+  use Test.System.Puppet
 
   def level_up(entity_key) do
     Option.some(lvl) = read(entity_key, :level)
+
     write(entity_key, :level, lvl + 1)
 
-    {:level_up, lvl, lvl + 1}
+    {lvl, lvl + 1}
   end
 end
 

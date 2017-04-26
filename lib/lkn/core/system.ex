@@ -27,38 +27,35 @@ defmodule Lkn.Core.System do
   alias Lkn.Core.System
 
   @type m :: module
-  @type entities :: %{Entity.t => module}
+  @type entities :: MapSet.t(Entity.t)
 
   defmodule State do
     @moduledoc false
 
     defstruct [
       :map_key,
-      :map_comp,
       :instance_key,
       :entities,
     ]
 
     @type t :: %State{
       map_key: Entity.t,
-      map_comp: module,
       instance_key: Instance.k,
       entities: System.entities,
     }
 
-    @spec new(Instance.k, term, module) :: t
-    def new(instance_key, map_key, map_comp) do
+    @spec new(Instance.k, term) :: t
+    def new(instance_key, map_key) do
       %State{
-        entities: Map.new(),
+        entities: MapSet.new(),
         instance_key: instance_key,
-        map_comp: map_comp,
         map_key: map_key,
       }
     end
 
-    @spec put(t, Entity.t, System.m) :: t
-    def put(state, entity_key, module) do
-      entities = Map.put(state.entities, entity_key, module)
+    @spec put(t, Entity.t) :: t
+    def put(state, entity_key) do
+      entities = MapSet.put(state.entities, entity_key)
 
       %State{state|
              entities: entities
@@ -68,13 +65,13 @@ defmodule Lkn.Core.System do
     @spec delete(t, Entity.t) :: t
     def delete(state, entity_key) do
       %State{state|
-             entities: Map.delete(state.entities, entity_key)
+             entities: MapSet.delete(state.entities, entity_key)
       }
     end
 
     @spec population(t) :: integer
     def population(state) do
-      Map.size(state.entities)
+      MapSet.size(state.entities)
     end
 
     @spec notify(t, any) :: :ok
@@ -96,7 +93,7 @@ defmodule Lkn.Core.System do
       use GenServer
       @type state :: unquote(state_t)
 
-      @callback init_state(Entity.t, module) :: state
+      @callback init_state(Entity.t) :: state
 
       def component(:puppet) do
         unquote(ec)
@@ -135,23 +132,17 @@ defmodule Lkn.Core.System do
         {:ok, state}
       end
 
-      def comp(entities, key) do
-        Map.fetch!(entities, key)
-      end
-
       defp priv_handle_cast(notif = {:notify, notification}, priv: priv, pub: pub) do
         State.notify(priv, notif)
         [priv: priv, pub: pub]
       end
 
       defp priv_handle_cast({:register_entity, entity_key}, priv: priv, pub: pub) do
-        {priv, pub} =
-          case Lkn.Core.Entity.get_component(entity_key, __MODULE__) do
-            Option.some(module) ->
-              {State.put(priv, entity_key, module), entity_enter(pub, priv.entities, entity_key)}
-            _ ->
-              {priv, pub}
-          end
+        {priv, pub} = if Lkn.Core.Entity.has_component?(entity_key, __MODULE__) do
+          {State.put(priv, entity_key), entity_enter(pub, priv.entities, entity_key)}
+        else
+          {priv, pub}
+        end
 
         [priv: priv, pub: pub]
       end
@@ -207,11 +198,11 @@ defmodule Lkn.Core.System do
     end
   end
 
-  def start_link(module, instance_key, map_key, map_comp) do
+  def start_link(module, instance_key, map_key) do
     GenServer.start_link(module,
       [
-        priv: State.new(instance_key, map_key, map_comp),
-        pub: module.init_state(map_key, map_comp),
+        priv: State.new(instance_key, map_key),
+        pub: module.init_state(map_key),
       ],
       name: Name.system(instance_key, module))
   end

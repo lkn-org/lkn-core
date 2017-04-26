@@ -16,65 +16,179 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 defmodule Lkn.Core.Component do
-  @moduledoc """
-  A behaviour module for implementing an `Lkn.Entity` Component.
-  """
-
-  alias Lkn.Core.Entity
-  alias Lkn.Core.Name
-  alias Lkn.Core.Properties
-
-  defmacro __using__(sys: sys, type: type) do
-    quote location: :keep do
-      use GenServer
-
-      use Lkn.Prelude
-
-      @behaviour unquote(sys).component(unquote(type))
-
-      @spec start_link(Entity.t) :: GenServer.on_start
-      def start_link(entity_key) do
-        Lkn.Core.Component.start_link(__MODULE__, entity_key, unquote(sys))
-      end
-
-      def system do
-        unquote(sys)
-      end
-
-      @spec read(Entity.t, Properties.prop) :: Option.t(Properties.value)
-      def read(entity_key, p) do
-        GenServer.call(Name.component(entity_key, unquote(sys)), {:read, p})
-      end
-
-      @spec write(Entity.t, Properties.prop, Properties.value) :: :ok
-      def write(entity_key, p, v) do
-        GenServer.call(Name.component(entity_key, unquote(sys)), {:write, p, v})
-      end
-
-      def handle_call({:read, p}, _from, entity_key) do
-        {:reply, Properties.read(entity_key, p), entity_key}
-      end
-
-      def handle_call({:write, p, v}, _from, entity_key) do
-        {:reply, Properties.write(entity_key, p, v), entity_key}
-      end
+  defp parse_specs(block, casts, calls, system, legit) do
+    case block do
+      [{:@, _, [{:doc, _, [docstring]}]},
+       {:@, _, [{:cast, _, [fun]}]}
+        |rest] ->
+        cast = %Cast{Cast.parse(fun)|doc: docstring}
+        parse_specs(rest, [cast|casts], calls, system, legit)
+      [{:@, _, [{:doc, _, [docstring]}]},
+       {:@, _, [{:call, _, [fun]}]}
+        |rest] ->
+        call = %Call{Call.parse(fun)|doc: docstring}
+        parse_specs(rest, casts, [call|calls], system, legit)
+      [{:@, _, [{:cast, _, [fun]}]}
+        |rest] ->
+        cast = Cast.parse(fun)
+        parse_specs(rest, [cast|casts], calls, system, legit)
+      [{:@, _, [{:call, _, [fun]}]}
+        |rest] ->
+        call = Call.parse(fun)
+        parse_specs(rest, casts, [call|calls], system, legit)
+      [{:@, _, [{:system, _, [mod]}]}
+        |rest] ->
+        parse_specs(rest, casts, calls, mod, legit)
+      [x|rest] ->
+        parse_specs(rest, casts, calls, system, [x|legit])
+      [] -> {casts, calls, system, Enum.reverse(legit)}
     end
   end
 
-  defmacro puppetify(for: sys) do
+  defp cast_client(module_name, cast) do
+    name = cast.fun.name
+    entity_key_type = quote do
+      Lkn.Core.Entity.t
+    end
+
+    cast_doc = if cast.doc != :none do
+      quote do
+        @doc unquote(cast.doc)
+      end
+    end
+
+    arglist = Enum.map(cast.fun.arguments, &(&1.name))
+    arglistcl = [{:entity_key, [], nil}|arglist]
+    argtypes = [entity_key_type|Enum.map(cast.fun.arguments, &(&1.type))]
+
     quote do
-      use unquote(__MODULE__), sys: unquote(sys), type: :puppet
+      unquote(cast_doc)
+      @spec unquote({name, [], argtypes}) :: :ok
+      def unquote({name, [], arglistcl}) do
+        GenServer.cast(Lkn.Core.Name.component(unquote({:entity_key, [], nil}), unquote(module_name)),
+                       {:spec, {unquote(name), unquote(arglist)}})
+      end
     end
   end
 
-  defmacro mapify(for: sys) do
+  defp call_client(module_name, call) do
+    name = call.fun.name
+    entity_key_type = quote do
+      Lkn.Core.Entity.t
+    end
+
+    call_doc = if call.doc != :none do
+      quote do
+        @doc unquote(call.doc)
+      end
+    end
+
+    arglist = Enum.map(call.fun.arguments, &(&1.name))
+    arglistcl = [{:entity_key, [], nil}|arglist]
+    argtypes = [entity_key_type|Enum.map(call.fun.arguments, &(&1.type))]
+
     quote do
-      use unquote(__MODULE__), sys: unquote(sys), type: :map
+      unquote(call_doc)
+      @spec unquote({name, [], argtypes}) :: unquote(call.ret)
+      def unquote({name, [], arglistcl}) do
+        GenServer.call(Lkn.Core.Name.component(unquote({:entity_key, [], nil}), unquote(module_name)),
+                       {:spec, {unquote(name), unquote(arglist)}})
+      end
     end
   end
 
-  @spec start_link(module, Entity.t, module) :: GenServer.on_start
-  def start_link(module, entity_key, sys) do
-    GenServer.start_link(module, entity_key, name: Name.component(entity_key, sys))
+  defp cast_behaviour(cast) do
+    name = cast.fun.name
+    entity_key_type = quote do
+      Lkn.Core.Entity.t
+    end
+
+    arglistcl = [{:::, [], [{:entity_key, [], nil}, entity_key_type]}
+                 |Enum.map(cast.fun.arguments, &({:::, [], [&1.name, &1.type]}))]
+
+    quote do
+      @callback unquote({name, [], arglistcl}) :: :ok
+    end
+  end
+
+  defp call_behaviour(call) do
+    name = call.fun.name
+    entity_key_type = quote do
+      Lkn.Core.Entity.t
+    end
+
+    arglistcl = [{:::, [], [{:entity_key, [], nil}, entity_key_type]}
+                 |Enum.map(call.fun.arguments, &({:::, [], [&1.name, &1.type]}))]
+
+    quote do
+      @callback unquote({name, [], arglistcl}) :: unquote(call.ret)
+    end
+  end
+
+  defmacro defspecs(name, do: {:__block__, _, block}) do
+    {casts, calls, system, legit} = parse_specs(block, [], [], :none, [])
+
+    casts_client = Enum.map(casts, &(cast_client(name, &1)))
+    calls_client = Enum.map(calls, &(call_client(name, &1)))
+
+    casts_behaviour = Enum.map(casts, &(cast_behaviour(&1)))
+    calls_behaviour = Enum.map(calls, &(call_behaviour(&1)))
+
+    quote do
+      defmodule unquote(name) do
+        unquote(legit)
+        unquote(casts_client)
+        unquote(calls_client)
+        unquote(casts_behaviour)
+        unquote(calls_behaviour)
+
+        def system do
+          unquote(system)
+        end
+
+        defmacro __using__(_) do
+          quote do
+            @behaviour unquote(__MODULE__)
+
+            use GenServer
+
+            alias Lkn.Core.Entity
+            alias Lkn.Core.Name
+            alias Lkn.Core.Properties
+
+            def specs do
+              unquote(__MODULE__)
+            end
+
+            @spec start_link(Entity.t) :: GenServer.on_start
+            def start_link(entity_key) do
+              GenServer.start_link(__MODULE__, entity_key, name: Name.component(entity_key, unquote(__MODULE__)))
+            end
+
+            @spec read(Entity.t, Properties.prop) :: Option.t(Properties.value)
+            defp read(entity_key, p) do
+              Properties.read(entity_key, p)
+            end
+
+            @spec write(Entity.t, Properties.prop, Properties.value) :: :ok
+            def write(entity_key, p, v) do
+              Properties.write(entity_key, p, v)
+            end
+
+            def handle_cast({:spec, {name, args}}, entity_key) do
+              :erlang.apply(__MODULE__, name, [entity_key|args])
+
+              {:noreply, entity_key}
+            end
+
+            def handle_call({:spec, {name, args}}, _call, entity_key) do
+              res = :erlang.apply(__MODULE__, name, [entity_key|args])
+
+              {:reply, res, entity_key}
+            end
+          end
+        end
+      end
+    end
   end
 end

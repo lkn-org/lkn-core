@@ -20,7 +20,6 @@ defmodule Lkn.Core.Entity.Components do
 
   alias Lkn.Core.Entity
   alias Lkn.Core.System
-  alias Lkn.Core.Component
 
   @moduledoc false
 
@@ -34,7 +33,7 @@ defmodule Lkn.Core.Entity.Components do
   :ignore
   def init({comps, entity_key}) do
     children = Enum.map(comps, fn comp_module ->
-      worker(Component, [comp_module, entity_key, comp_module.system()])
+      worker(comp_module, [entity_key])
     end)
 
     supervise(children, strategy: :one_for_one)
@@ -65,10 +64,10 @@ defmodule Lkn.Core.Entity do
       def init(key: entity_key, args: args) do
         props = init_properties(args)
 
-        comps_sys = Enum.reduce(unquote(comps), Map.new, &Map.put(&2, &1.system(), &1))
+        sys = Enum.map(unquote(comps), &(&1.specs().system()))
 
         children = [
-          worker(Agent, [fn -> comps_sys end, [name: Name.comps_list(entity_key)]]),
+          worker(Agent, [fn -> sys end, [name: Name.comps_list(entity_key)]]),
           worker(Properties, [props, entity_key]),
           supervisor(Lkn.Core.Entity.Components, [unquote(comps), entity_key]),
         ]
@@ -83,25 +82,12 @@ defmodule Lkn.Core.Entity do
     Supervisor.start_link(module, [key: key, args: args], name: Name.entity(key))
   end
 
-  @spec get_component(t, System.m) :: Option.t(Component.m)
-  def get_component(key, sys) do
-    r = Agent.get(Lkn.Core.Name.comps_list(key), &Map.fetch(&1, sys))
-
-    case r do
-      {:ok, t} -> Option.some(t)
-      _ -> Option.nothing()
-    end
-  end
-
   @spec has_component?(t, System.m) :: boolean
   def has_component?(key, sys) do
-    case Agent.get(Lkn.Core.Name.comps_list(key), &Map.fetch(&1, sys)) do
-      {:ok, _} -> true
-      _ -> false
-    end
+    Agent.get(Lkn.Core.Name.comps_list(key), &Enum.member?(&1, sys))
   end
 
-  @spec systems(t) :: %{System.m => module}
+  @spec systems(t) :: [System.m]
   def systems(key) do
     Agent.get(Lkn.Core.Name.comps_list(key), fn r -> r end)
   end

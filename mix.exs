@@ -52,7 +52,7 @@ defmodule Lkn.Mixfile do
       {:dialyxir,    "~> 0.5",  only: :dev,          runtime: false},
       {:ex_doc,      "~> 0.15", only: :dev,          runtime: false},
       {:excoveralls, "~> 0.6",  only: :test,         runtime: false},
-      {:distillery,  "~> 1.0"},
+      {:distillery,  "~> 1.0",                       runtime: false},
     ]
   end
 
