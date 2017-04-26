@@ -428,3 +428,51 @@ defmodule Test.Puppeteer do
     target
   end
 end
+
+
+######################################################################
+#                             TEST COMP                              #
+#                                                                    #
+defspecs Test.C do
+  @moduledoc """
+  Dummy component to test the defspecs macro in depth.
+  """
+
+  @system NoBody
+
+  # cast without any doc nor args
+  @cast f1()
+
+  # cast without any doc
+  @cast f2(x :: number, y :: String.t)
+
+  # cast with doc but without args
+  @doc """
+  Hi.
+  """
+  @cast f3()
+
+  # cast with doc and args
+  @doc """
+  Hi.
+  """
+  @cast f4(x :: number, y :: String.t)
+
+  # call without any doc nor args
+  @call f5() :: boolean
+
+  # call without any doc
+  @call f6(z :: number, a :: String.t) :: no_return
+
+  # call with doc, no args
+  @doc """
+  Hi.
+  """
+  @call f7() :: boolean
+
+  # call with doc and args
+  @doc """
+  Hi.
+  """
+  @call f8(z :: number, a :: String.t) :: no_return
+end
