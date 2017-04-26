@@ -125,7 +125,12 @@ defmodule Lkn.Core.Component do
     end
   end
 
-  defmacro defspecs(name, do: {:__block__, _, block}) do
+  defmacro defspecs(name, do: block) do
+    block = case block do
+              {:__block__, _, x} -> x
+              x -> [x]
+            end
+
     {casts, calls, system, legit} = parse_specs(block, [], [], :none, [])
 
     casts_client = Enum.map(casts, &(cast_client(name, &1)))
