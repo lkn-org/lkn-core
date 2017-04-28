@@ -307,7 +307,7 @@ end
 defmodule Test.System do
   use Lkn.Core.System,
     state: :ok,
-    puppet_component: Test.System.Component,
+    puppet_component: Test.System.Puppet,
     map_component: Test.System.Map
 
   def init_state(_map_key) do
@@ -380,8 +380,10 @@ defmodule Test.Entity.Component do
   end
 end
 
-defmodule Test.Entity do
-  use Lkn.Core.Entity, components: [Test.Entity.Component]
+import Lkn.Core.Puppet
+
+defpuppet Test.Entity do
+  @components [Test.Entity.Component]
 
   def start_link(key, args = [name: _name, level: _level]) do
     Lkn.Core.Entity.start_link(__MODULE__, key, args)
@@ -392,8 +394,8 @@ defmodule Test.Entity do
   end
 end
 
-defmodule Test.Ghost do
-  use Lkn.Core.Entity, components: []
+defpuppet Test.Ghost do
+  @components []
 
   def start_link(key) do
     Lkn.Core.Entity.start_link(__MODULE__, key, [])
