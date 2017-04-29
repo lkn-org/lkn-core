@@ -23,12 +23,12 @@ defmodule Lkn.Core.Entity.Components do
 
   @moduledoc false
 
-  @spec start_link([module], Entity.t) :: Supervisor.on_start
+  @spec start_link([module], Entity.k) :: Supervisor.on_start
   def start_link(comps, entity_key) do
     Supervisor.start_link(__MODULE__, {comps, entity_key})
   end
 
-  @spec init({[System.m], Entity.t}) ::
+  @spec init({[System.m], Entity.k}) ::
   {:ok, {:supervisor.sup_flags, [Supervisor.Spec.spec]}} |
   :ignore
   def init({comps, entity_key}) do
@@ -50,7 +50,11 @@ defmodule Lkn.Core.Entity do
   A behaviour module for implementing an Entity.
   """
 
-  @type t :: any
+  @typedoc """
+  A key to identify and reach an Entity, that is either a
+  `Lkn.Core.Puppet` or a `Lkn.Core.Map`.
+  """
+  @type k :: Lkn.Core.Map.k | Lkn.Core.Puppet.k
   @type init_args :: any
 
   @callback init_properties(init_args) :: map
@@ -77,22 +81,22 @@ defmodule Lkn.Core.Entity do
     end
   end
 
-  @spec start_link(module, t, init_args) :: Supervisor.on_start
+  @spec start_link(module, k, init_args) :: Supervisor.on_start
   def start_link(module, key, args) do
     Supervisor.start_link(module, [key: key, args: args], name: Name.entity(key))
   end
 
-  @spec has_component?(t, System.m) :: boolean
+  @spec has_component?(k, System.m) :: boolean
   def has_component?(key, sys) do
     Agent.get(Lkn.Core.Name.comps_list(key), &Enum.member?(&1, sys))
   end
 
-  @spec systems(t) :: [System.m]
+  @spec systems(k) :: [System.m]
   def systems(key) do
     Agent.get(Lkn.Core.Name.comps_list(key), fn r -> r end)
   end
 
-  @spec read(t, Lkn.Core.Properties.prop) :: Option.t(Lkn.Core.Properties.value)
+  @spec read(k, Lkn.Core.Properties.prop) :: Option.t(Lkn.Core.Properties.value)
   def read(key, prop) do
     Lkn.Core.Properties.read(key, prop)
   end

@@ -38,7 +38,7 @@ defmodule Lkn.Core.Puppeteer do
       use GenServer
 
       alias Lkn.Core.Instance
-      alias Lkn.Core.Entity
+      alias Lkn.Core, as: L
 
       @type state :: unquote(state_t)
 
@@ -55,7 +55,7 @@ defmodule Lkn.Core.Puppeteer do
         @type t :: %State{
           puppeteer_key: Puppeteer.k,
           instance_key:  Lkn.Prelude.Option.t(Instance.k),
-          map_key:       Lkn.Prelude.Option.t(Entity.t),
+          map_key:       Lkn.Prelude.Option.t(L.Map.k),
           state:         unquote(state_t),
         }
 
@@ -120,7 +120,7 @@ defmodule Lkn.Core.Puppeteer do
     GenServer.cast(Name.puppeteer(puppeteer_key), {:leave_instance, instance_key})
   end
 
-  @spec find_instance(k, Entity.t) :: Instance.k
+  @spec find_instance(k, L.Map.k) :: Instance.k
   def find_instance(puppeteer_key, map_key) do
     GenServer.call(Name.puppeteer(puppeteer_key), {:find_instance, map_key})
   end

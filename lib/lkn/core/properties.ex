@@ -25,7 +25,7 @@ defmodule Lkn.Core.Properties do
   @type prop :: any
   @type value :: any
 
-  @spec start_link(map, Lkn.Core.Entity.t) :: Agent.on_start
+  @spec start_link(map, Lkn.Core.Entity.k) :: Agent.on_start
   @doc """
   Start a new Agent for the Entity identified as `key`.
   """
@@ -33,7 +33,7 @@ defmodule Lkn.Core.Properties do
     Agent.start_link(fn -> content end, name: Lkn.Core.Name.properties(entity_key))
   end
 
-  @spec read(Lkn.Core.Entity.t, prop) :: Option.t(value)
+  @spec read(Lkn.Core.Entity.k, prop) :: Option.t(value)
   @doc """
   Read the value of the given `prop`.
   """
@@ -44,7 +44,7 @@ defmodule Lkn.Core.Properties do
     end
   end
 
-  @spec write(Lkn.Core.Entity.t, prop, value) :: :ok
+  @spec write(Lkn.Core.Entity.k, prop, value) :: :ok
   @doc """
   Update the value of the given `prop`.
   """

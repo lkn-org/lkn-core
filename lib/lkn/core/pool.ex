@@ -42,7 +42,7 @@ defmodule Lkn.Core.Pool.GenServer do
 
   require Logger
 
-  alias Lkn.Core.Entity
+  alias Lkn.Core, as: L
   alias Lkn.Core.Instance
   alias Lkn.Core.Name
   alias Lkn.Core.Puppeteer
@@ -58,11 +58,11 @@ defmodule Lkn.Core.Pool.GenServer do
     ]
 
     @type t :: %State{
-      map_key: Entity.t,
+      map_key: L.Map.k,
       instances: [Instance.k],
     }
 
-    @spec new(Entity.t) :: t
+    @spec new(L.Map.k) :: t
     def new(map_key) do
       %State{
         map_key: map_key,
@@ -157,12 +157,12 @@ defmodule Lkn.Core.Pool do
     supervise(children, strategy: :one_for_all)
   end
 
-  @spec kill_request(Entity.t, Instance.k) :: :ok
+  @spec kill_request(L.Map.k, Instance.k) :: :ok
   def kill_request(map_key, instance_key) do
     GenServer.cast(Name.pool(map_key), {:kill_request, instance_key})
   end
 
-  @spec register_puppeteer(Entity.t, Puppeteer.k, Puppeteer.m) :: Instance.k
+  @spec register_puppeteer(L.Map.k, Puppeteer.k, Puppeteer.m) :: Instance.k
   def register_puppeteer(map_key, puppeteer_key, puppeteer_module) do
     instance_key = GenServer.call(Name.pool(map_key), {:register, puppeteer_key, puppeteer_module})
 
@@ -171,7 +171,7 @@ defmodule Lkn.Core.Pool do
     instance_key
   end
 
-  @spec spawn_pool(Entity.t) :: :ok
+  @spec spawn_pool(L.Map.k) :: :ok
   def spawn_pool(map_key) do
     {:ok, _} = Supervisor.start_child(Lkn.Core.Pool.Supervisor, [map_key])
     :ok

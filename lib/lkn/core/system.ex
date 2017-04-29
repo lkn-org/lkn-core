@@ -22,12 +22,13 @@ defmodule Lkn.Core.System do
 
   use Lkn.Prelude
 
-  alias Lkn.Core.Entity
+  alias Lkn.Core.Map
   alias Lkn.Core.Name
+  alias Lkn.Core.Puppet
   alias Lkn.Core.System
 
   @type m :: module
-  @type entities :: MapSet.t(Entity.t)
+  @type puppets :: MapSet.t(Puppet.t)
 
   defmodule State do
     @moduledoc false
@@ -35,43 +36,43 @@ defmodule Lkn.Core.System do
     defstruct [
       :map_key,
       :instance_key,
-      :entities,
+      :puppets,
     ]
 
     @type t :: %State{
-      map_key: Entity.t,
+      map_key: Map.k,
       instance_key: Instance.k,
-      entities: System.entities,
+      puppets: System.puppets,
     }
 
-    @spec new(Instance.k, term) :: t
+    @spec new(Instance.k, Map.k) :: t
     def new(instance_key, map_key) do
       %State{
-        entities: MapSet.new(),
+        puppets: MapSet.new(),
         instance_key: instance_key,
         map_key: map_key,
       }
     end
 
-    @spec put(t, Entity.t) :: t
-    def put(state, entity_key) do
-      entities = MapSet.put(state.entities, entity_key)
+    @spec put(t, Puppet.k) :: t
+    def put(state, puppet_key) do
+      puppets = MapSet.put(state.puppets, puppet_key)
 
       %State{state|
-             entities: entities
+             puppets: puppets
       }
     end
 
-    @spec delete(t, Entity.t) :: t
-    def delete(state, entity_key) do
+    @spec delete(t, Puppet.k) :: t
+    def delete(state, puppet_key) do
       %State{state|
-             entities: MapSet.delete(state.entities, entity_key)
+             puppets: MapSet.delete(state.puppets, puppet_key)
       }
     end
 
     @spec population(t) :: integer
     def population(state) do
-      MapSet.size(state.entities)
+      MapSet.size(state.puppets)
     end
 
     @spec notify(t, any) :: :ok
@@ -93,7 +94,7 @@ defmodule Lkn.Core.System do
       use GenServer
       @type state :: unquote(state_t)
 
-      @callback init_state(Entity.t) :: state
+      @callback init_state(Map.k) :: state
 
       def component(:puppet) do
         unquote(ec)
@@ -102,33 +103,33 @@ defmodule Lkn.Core.System do
         unquote(em)
       end
 
-      @spec entity_enter(state, System.entities, Entity.t) :: state
+      @spec puppet_enter(state, System.puppets, Puppet.k) :: state
       @doc """
       A callback called when a new entity is added to the system.
 
       **Note:** it can be overriden.
       """
-      def entity_enter(state, entities, entity_key) do
+      def puppet_enter(state, puppets, puppet_key) do
         state
       end
 
-      @spec entity_leave(state, System.entities, Entity.t) :: state
+      @spec puppet_leave(state, System.puppets, Puppet.k) :: state
       @doc """
       A callback called when an entity is removed from the system.
 
       **Note:** it can be overriden.
       """
-      def entity_leave(state, entities, key) do
+      def puppet_leave(state, _puppets, _key) do
         state
       end
 
-      @spec system_cast(any, Lkn.Core.System.entities, state) :: state
-      def system_cast(cmd, entities, state) do
+      @spec system_cast(any, Lkn.Core.System.puppets, state) :: state
+      def system_cast(_cmd, _puppets, state) do
         state
       end
 
-      @spec system_call(any, term, Lkn.Core.System.entities, state) :: term
-      def system_call(cmd, _from, entities, state) do
+      @spec system_call(any, term, Lkn.Core.System.puppets, state) :: term
+      def system_call(_cmd, _from, _puppets, state) do
         {:ok, state}
       end
 
@@ -137,9 +138,9 @@ defmodule Lkn.Core.System do
         [priv: priv, pub: pub]
       end
 
-      defp priv_handle_cast({:register_entity, entity_key}, priv: priv, pub: pub) do
+      defp priv_handle_cast({:register_puppet, entity_key}, priv: priv, pub: pub) do
         {priv, pub} = if Lkn.Core.Entity.has_component?(entity_key, __MODULE__) do
-          {State.put(priv, entity_key), entity_enter(pub, priv.entities, entity_key)}
+          {State.put(priv, entity_key), puppet_enter(pub, priv.puppets, entity_key)}
         else
           {priv, pub}
         end
@@ -147,11 +148,11 @@ defmodule Lkn.Core.System do
         [priv: priv, pub: pub]
       end
 
-      defp priv_handle_cast({:unregister_entity, entity_key}, priv: priv, pub: pub) do
+      defp priv_handle_cast({:unregister_puppet, entity_key}, priv: priv, pub: pub) do
         {priv, pub} =
           if Lkn.Core.Entity.has_component?(entity_key, __MODULE__) do
             priv = State.delete(priv, entity_key)
-            {priv, entity_leave(pub, priv.entities, entity_key)}
+            {priv, puppet_leave(pub, priv.puppets, entity_key)}
           else
             {priv, pub}
           end
@@ -168,7 +169,7 @@ defmodule Lkn.Core.System do
       end
 
       def handle_cast({:pub, cmd}, priv: priv, pub: pub) do
-        pub = system_cast(cmd, priv.entities, pub)
+        pub = system_cast(cmd, priv.puppets, pub)
         {:noreply, [priv: priv, pub: pub]}
       end
 
@@ -177,27 +178,30 @@ defmodule Lkn.Core.System do
       end
 
       def handle_call({:pub, cmd}, from, priv: priv, pub: pub) do
-        {res, pub} = system_call(cmd, from, priv.entities, pub)
+        {res, pub} = system_call(cmd, from, priv.puppets, pub)
         {:reply, res, [priv: priv, pub: pub]}
       end
 
+      @spec cast(Instance.k, term) :: :ok
       def cast(instance_key, cmd) do
         Lkn.Core.System.cast(instance_key, __MODULE__, cmd)
       end
 
-      def call(instance_key, system, cmd) do
+      @spec call(Instance.k, term) :: any
+      def call(instance_key, cmd) do
         Lkn.Core.System.call(instance_key, __MODULE__, cmd)
       end
 
       defoverridable [
         system_cast: 3,
         system_call: 4,
-        entity_enter: 3,
-        entity_leave: 3,
+        puppet_enter: 3,
+        puppet_leave: 3,
       ]
     end
   end
 
+  @spec start_link(System.m, Instance.k, Map.k) :: GenServer.on_start
   def start_link(module, instance_key, map_key) do
     GenServer.start_link(module,
       [
@@ -207,22 +211,30 @@ defmodule Lkn.Core.System do
       name: Name.system(instance_key, module))
   end
 
+  @spec cast(Instance.k, System.m, term) :: :ok
   def cast(instance_key, system, cmd) do
     GenServer.cast(Name.system(instance_key, system), {:pub, cmd})
   end
 
+  @spec call(Instance.k, System.m, term) :: any
   def call(instance_key, system, cmd) do
     GenServer.call(Name.system(instance_key, system), {:pub, cmd})
   end
 
-  def register_entity(instance_key, system, entity_key) do
-    GenServer.cast(Name.system(instance_key, system), {:priv, {:register_entity, entity_key}})
+  @spec register_puppet(Instance.k, System.m, Puppet.k) :: :ok
+  def register_puppet(instance_key, system, puppet_key) do
+    GenServer.cast(Name.system(instance_key, system), {:priv, {:register_puppet, puppet_key}})
   end
 
-  def unregister_entity(instance_key, system, entity_key) do
-    GenServer.cast(Name.system(instance_key, system), {:priv, {:unregister_entity, entity_key}})
+  @spec unregister_puppet(Instance.k, System.m, Puppet.k) :: :ok
+  def unregister_puppet(instance_key, system, puppet_key) do
+    GenServer.cast(Name.system(instance_key, system), {:priv, {:unregister_puppet, puppet_key}})
   end
 
+  @doc """
+  Reserve to a System Process.
+  """
+  @spec notify(any) :: :ok
   def notify(notification) do
     GenServer.cast(self(), {:priv, {:notify, notification}})
   end

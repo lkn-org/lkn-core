@@ -86,7 +86,7 @@ defmodule Lkn.Core.Test do
     {:ok, _} = Test.Ghost.start_link(ghost_key)
 
     0 = Lkn.Core.System.population_size(instance_key, Test.System)
-    Lkn.Core.Instance.register_entity(instance_key, entity_key)
+    Lkn.Core.Instance.register_puppet(instance_key, entity_key)
     1 = Lkn.Core.System.population_size(instance_key, Test.System)
 
     receive do
@@ -94,7 +94,7 @@ defmodule Lkn.Core.Test do
       after 100 -> assert false
     end
 
-    Lkn.Core.Instance.register_entity(instance_key, ghost_key)
+    Lkn.Core.Instance.register_puppet(instance_key, ghost_key)
     1 = Lkn.Core.System.population_size(instance_key, Test.System)
 
     receive do
@@ -102,7 +102,7 @@ defmodule Lkn.Core.Test do
       after 100 -> :ok
     end
 
-    Lkn.Core.Instance.unregister_entity(instance_key, entity_key)
+    Lkn.Core.Instance.unregister_puppet(instance_key, entity_key)
     0 = Lkn.Core.System.population_size(instance_key, Test.System)
 
     receive do
@@ -126,7 +126,7 @@ defmodule Lkn.Core.Test do
 
     {:ok, _} = Test.Entity.start_link(entity_key, name: "lkn", level: 4)
 
-    Lkn.Core.Instance.register_entity(instance_key, entity_key)
+    Lkn.Core.Instance.register_puppet(instance_key, entity_key)
 
     Test.System.level_up(instance_key, entity_key)
 
@@ -318,12 +318,12 @@ defmodule Test.System do
     Lkn.Core.System.start_link(__MODULE__, instance_key, map_key)
   end
 
-  def entity_enter(:ok, _entities, key) do
+  def puppet_enter(:ok, _entities, key) do
     Lkn.Core.System.notify({:enter, key})
     :ok
   end
 
-  def entity_leave(:ok, _entities, key) do
+  def puppet_leave(:ok, _entities, key) do
     Lkn.Core.System.notify({:leave, key})
     :ok
   end

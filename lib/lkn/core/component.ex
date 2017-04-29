@@ -48,7 +48,7 @@ defmodule Lkn.Core.Component do
   defp cast_client(module_name, cast) do
     name = cast.fun.name
     entity_key_type = quote do
-      Lkn.Core.Entity.t
+      Lkn.Core.Entity.k
     end
 
     cast_doc = if cast.doc != :none do
@@ -74,7 +74,7 @@ defmodule Lkn.Core.Component do
   defp call_client(module_name, call) do
     name = call.fun.name
     entity_key_type = quote do
-      Lkn.Core.Entity.t
+      Lkn.Core.Entity.k
     end
 
     call_doc = if call.doc != :none do
@@ -100,7 +100,7 @@ defmodule Lkn.Core.Component do
   defp cast_behaviour(cast) do
     name = cast.fun.name
     entity_key_type = quote do
-      Lkn.Core.Entity.t
+      Lkn.Core.Entity.k
     end
 
     arglistcl = [{:::, [], [{:entity_key, [], nil}, entity_key_type]}
@@ -114,7 +114,7 @@ defmodule Lkn.Core.Component do
   defp call_behaviour(call) do
     name = call.fun.name
     entity_key_type = quote do
-      Lkn.Core.Entity.t
+      Lkn.Core.Entity.k
     end
 
     arglistcl = [{:::, [], [{:entity_key, [], nil}, entity_key_type]}
@@ -165,17 +165,17 @@ defmodule Lkn.Core.Component do
               unquote(__MODULE__)
             end
 
-            @spec start_link(Entity.t) :: GenServer.on_start
+            @spec start_link(Entity.k) :: GenServer.on_start
             def start_link(entity_key) do
               GenServer.start_link(__MODULE__, entity_key, name: Name.component(entity_key, unquote(__MODULE__)))
             end
 
-            @spec read(Entity.t, Properties.prop) :: Option.t(Properties.value)
+            @spec read(Entity.k, Properties.prop) :: Option.t(Properties.value)
             defp read(entity_key, p) do
               Properties.read(entity_key, p)
             end
 
-            @spec write(Entity.t, Properties.prop, Properties.value) :: :ok
+            @spec write(Entity.k, Properties.prop, Properties.value) :: :ok
             def write(entity_key, p, v) do
               Properties.write(entity_key, p, v)
             end

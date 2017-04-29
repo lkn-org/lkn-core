@@ -22,25 +22,27 @@ defmodule Lkn.Core do
     @type t :: term
 
     alias Lkn.Core.Entity
+    alias Lkn.Core.Map
+    alias Lkn.Core.Entity
     alias Lkn.Core.Instance
     alias Lkn.Core.System
 
-    @spec properties(Entity.t) :: t
+    @spec properties(Entity.k) :: t
     def properties(entity_key) do
       {:via, Registry, {Lkn.Core.Registry, {:entity, entity_key, :props}}}
     end
 
-    @spec component(Entity.t, System.m) :: t
+    @spec component(Entity.k, System.m) :: t
     def component(entity_key, system) do
       {:via, Registry, {Lkn.Core.Registry, {:entity, entity_key, system}}}
     end
 
-    @spec comps_list(Entity.t) :: t
+    @spec comps_list(Entity.k) :: t
     def comps_list(entity_key) do
       {:via, Registry, {Lkn.Core.Registry, {:entity, entity_key, :comps_list}}}
     end
 
-    @spec entity(Entity.t) :: t
+    @spec entity(Entity.k) :: t
     def entity(entity_key) do
       {:via, Registry, {Lkn.Core.Registry, {:entity, entity_key}}}
     end
@@ -65,12 +67,12 @@ defmodule Lkn.Core do
       {:via, Registry, {Lkn.Core.Registry, {:puppeteer, puppeteer_key}}}
     end
 
-    @spec pool(Entity.t) :: t
+    @spec pool(Map.k) :: t
     def pool(map_key) do
       {:via, Registry, {Lkn.Core.Registry, {:pool, map_key}}}
     end
 
-    @spec instance_sup(Entity.t) :: t
+    @spec instance_sup(Map.k) :: t
     def instance_sup(map_key) do
       {:via, Registry, {Lkn.Core.Registry, {:pool, map_key, :sup}}}
     end

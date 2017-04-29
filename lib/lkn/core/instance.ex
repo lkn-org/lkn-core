@@ -38,6 +38,8 @@ defmodule Lkn.Core.Instance do
   use Lkn.Prelude
 
   alias Lkn.Core.Entity
+  alias Lkn.Core.Puppet
+  alias Lkn.Core, as: L
   alias Lkn.Core.Name
   alias Lkn.Core.Pool
   alias Lkn.Core.Puppeteer
@@ -64,19 +66,19 @@ defmodule Lkn.Core.Instance do
     @type t :: %State {
       locked: boolean,
       mode: mode,
-      map_key: Entity.t,
+      map_key: L.Map.k,
       instance_key: Instance.k,
       puppeteers: %{Puppeteer.k => Puppeteer.m},
     }
 
-    @spec new(Entity.t, Instance.k) :: t
+    @spec new(L.Map.k, Instance.k) :: t
     def new(map_key, instance_key) do
       %State{
-        locked:     false,
-        mode:       :running,
-        map_key:    map_key,
+        locked:       false,
+        mode:         :running,
+        map_key:      map_key,
         instance_key: instance_key,
-        puppeteers: Map.new(),
+        puppeteers:   Map.new(),
       }
     end
 
@@ -155,12 +157,12 @@ defmodule Lkn.Core.Instance do
   use GenServer
 
   @doc false
-  @spec start_link(Entity.t, k) :: GenServer.on_start
+  @spec start_link(L.Map.k, k) :: GenServer.on_start
   def start_link(map_key, instance_key) do
     GenServer.start_link(__MODULE__, [map: map_key, instance: instance_key], name: Name.instance(instance_key))
   end
 
-  @spec spawn_instance(Entity.t, k) :: Supervisor.on_start
+  @spec spawn_instance(L.Map.k, k) :: Supervisor.on_start
   def spawn_instance(map_key, instance_key) do
     Supervisor.start_child(Name.instance_sup(map_key), [instance_key])
   end
@@ -175,13 +177,13 @@ defmodule Lkn.Core.Instance do
     {:ok, State.new(map_key, instance_key)}
   end
 
-  @spec register_entity(k, Entity.t) :: :ok
-  def register_entity(instance_key, entity_key) do
-    sys_map = Entity.systems(entity_key)
+  @spec register_puppet(k, Puppet.k) :: :ok
+  def register_puppet(instance_key, puppet_key) do
+    sys_map = Entity.systems(puppet_key)
 
     _ = Enum.map(sys_map, fn sys ->
       try do
-        Lkn.Core.System.register_entity(instance_key, sys, entity_key)
+        Lkn.Core.System.register_puppet(instance_key, sys, puppet_key)
       rescue
         _ -> ()
       end
@@ -190,13 +192,13 @@ defmodule Lkn.Core.Instance do
     :ok
   end
 
-  @spec unregister_entity(k, Entity.t) :: :ok
-  def unregister_entity(instance_key, entity_key) do
-    sys_map = Entity.systems(entity_key)
+  @spec unregister_puppet(k, Puppet.k) :: :ok
+  def unregister_puppet(instance_key, puppet_key) do
+    sys_map = Entity.systems(puppet_key)
 
     _ = Enum.map(sys_map, fn sys ->
       try do
-        Lkn.Core.System.unregister_entity(instance_key, sys, entity_key)
+        Lkn.Core.System.unregister_puppet(instance_key, sys, puppet_key)
       rescue
         _ -> ()
       end
