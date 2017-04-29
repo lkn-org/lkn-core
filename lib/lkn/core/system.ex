@@ -78,8 +78,8 @@ defmodule Lkn.Core.System do
     @spec notify(t, any) :: :ok
     def notify(state, notif) do
       Registry.dispatch(Lkn.Core.Notifier, Name.notify_group(state.instance_key), fn entries ->
-        for {pid, _} <- entries do
-          send pid, notif
+        for {_, key} <- entries do
+          notif.(key)
         end
       end)
     end
@@ -133,8 +133,8 @@ defmodule Lkn.Core.System do
         {:ok, state}
       end
 
-      defp priv_handle_cast(notif = {:notify, notification}, priv: priv, pub: pub) do
-        State.notify(priv, notif)
+      defp priv_handle_cast({:notify, notification}, priv: priv, pub: pub) do
+        State.notify(priv, notification)
         [priv: priv, pub: pub]
       end
 
@@ -192,6 +192,11 @@ defmodule Lkn.Core.System do
         Lkn.Core.System.call(instance_key, __MODULE__, cmd)
       end
 
+      @spec notify(any) :: :ok
+      defp notify(notification) do
+        GenServer.cast(self(), {:priv, {:notify, notification}})
+      end
+
       defoverridable [
         system_cast: 3,
         system_call: 4,
@@ -229,14 +234,6 @@ defmodule Lkn.Core.System do
   @spec unregister_puppet(Instance.k, System.m, Puppet.k) :: :ok
   def unregister_puppet(instance_key, system, puppet_key) do
     GenServer.cast(Name.system(instance_key, system), {:priv, {:unregister_puppet, puppet_key}})
-  end
-
-  @doc """
-  Reserve to a System Process.
-  """
-  @spec notify(any) :: :ok
-  def notify(notification) do
-    GenServer.cast(self(), {:priv, {:notify, notification}})
   end
 
   @spec population_size(Instance.k, module) :: integer

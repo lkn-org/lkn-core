@@ -90,8 +90,8 @@ defmodule Lkn.Core.Test do
     1 = Lkn.Core.System.population_size(instance_key, Test.System)
 
     receive do
-      {:notify, {:enter, x}} -> assert x == entity_key
-      after 100 -> assert false
+      {:enter, x} -> assert x == entity_key
+      after 100 -> raise "Waiting for 100ms the message {:enter, #{inspect entity_key}}"
     end
 
     Lkn.Core.Instance.register_puppet(instance_key, ghost_key)
@@ -106,7 +106,7 @@ defmodule Lkn.Core.Test do
     0 = Lkn.Core.System.population_size(instance_key, Test.System)
 
     receive do
-      {:notify, {:leave, x}} -> assert x == entity_key
+      {:leave, x} -> assert x == entity_key
       after 100 -> assert false
     end
   end
@@ -131,13 +131,13 @@ defmodule Lkn.Core.Test do
     Test.System.level_up(instance_key, entity_key)
 
     receive do
-      {:notify, {:enter, x}} -> assert x == entity_key
-      after 100 -> assert false
+      {:enter, x} -> assert x == entity_key
+      after 100 -> raise "Waiting for 100ms the message {:enter, #{inspect entity_key}}"
     end
 
     receive do
-      {:notify, {:level_up, {4, 5}}} -> :ok
-      after 100 -> assert false
+      {:level_up, {4, 5}} -> :ok
+      after 100 -> raise "Waiting for 100ms the message {:level_up, {4, 5}}"
     end
   end
 
@@ -319,19 +319,20 @@ defmodule Test.System do
   end
 
   def puppet_enter(:ok, _entities, key) do
-    Lkn.Core.System.notify({:enter, key})
+    notify(&(Test.Puppeteer.emit(&1, {:enter, key})))
     :ok
   end
 
   def puppet_leave(:ok, _entities, key) do
-    Lkn.Core.System.notify({:leave, key})
+    notify(&(Test.Puppeteer.emit(&1, {:leave, key})))
     :ok
   end
 
-  def system_cast({:level_up, entity_key}, _entities, state) do
+  def system_cast({:level_up, entity_key}, _entities, :ok) do
     notif = Test.System.Puppet.level_up(entity_key)
-    Lkn.Core.System.notify({:level_up, notif})
-    state
+    notify(&(Test.Puppeteer.emit(&1, {:level_up, notif})))
+
+    :ok
   end
 
   def level_up(key, entity_key) do
@@ -427,9 +428,18 @@ defmodule Test.Puppeteer do
     target
   end
 
-  def handle_message(target, msg) do
+  def puppeteer_handle_cast({:emit, msg}, target) do
     send(target, msg)
+
     target
+  end
+
+  def handle_message(target, _msg) do
+    target
+  end
+
+  def emit(puppeteer_key, msg) do
+    cast(puppeteer_key, {:emit, msg})
   end
 end
 

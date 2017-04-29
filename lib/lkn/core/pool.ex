@@ -166,7 +166,7 @@ defmodule Lkn.Core.Pool do
   def register_puppeteer(map_key, puppeteer_key, puppeteer_module) do
     instance_key = GenServer.call(Name.pool(map_key), {:register, puppeteer_key, puppeteer_module})
 
-    Registry.register(Lkn.Core.Notifier, Name.notify_group(instance_key), puppeteer_module)
+    Registry.register(Lkn.Core.Notifier, Name.notify_group(instance_key), puppeteer_key)
 
     instance_key
   end

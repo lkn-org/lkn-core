@@ -86,6 +86,10 @@ defmodule Lkn.Core.Puppeteer do
           {:noreply, state}
         end
       end
+      def handle_cast({:specific, msg}, state) do
+        s2 = puppeteer_handle_cast(msg, state.state)
+        {:noreply, %State{state|state: s2}}
+      end
 
       def handle_call({:find_instance, map_key}, _from, state) do
         instance_key = Lkn.Core.Pool.register_puppeteer(map_key, state.puppeteer_key, __MODULE__)
@@ -95,6 +99,9 @@ defmodule Lkn.Core.Puppeteer do
         {:reply, instance_key, state}
       end
 
+      def puppeteer_handle_cast(_msg, state) do
+        state
+      end
 
       def handle_info(msg, state) do
         state = %State{state|state: handle_message(state.state, msg)}
@@ -102,7 +109,15 @@ defmodule Lkn.Core.Puppeteer do
         {:noreply, state}
       end
 
+      def cast(puppeteer_key, msg) do
+        GenServer.cast(Name.puppeteer(puppeteer_key), {:specific, msg})
+      end
+
       @behaviour Lkn.Core.Puppeteer
+
+      defoverridable [
+        puppeteer_handle_cast: 2,
+      ]
     end
   end
 
