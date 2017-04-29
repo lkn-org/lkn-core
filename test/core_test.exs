@@ -286,7 +286,7 @@ end
 
 import Lkn.Core.Component
 
-defspecs Test.System.Puppet do
+defcomponent Test.System.Puppet do
   @system Test.System
 
   @doc """
@@ -295,7 +295,7 @@ defspecs Test.System.Puppet do
   @call level_up() :: {number, number}
 end
 
-defspecs Test.System.Map do
+defcomponent Test.System.Map do
   @system Test.System
 
   @doc """
@@ -447,7 +447,7 @@ end
 ######################################################################
 #                             TEST COMP                              #
 #                                                                    #
-defspecs Test.C do
+defcomponent Test.C do
   @moduledoc """
   Dummy component to test the defspecs macro in depth.
   """

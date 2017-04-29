@@ -15,36 +15,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-defmodule Lkn.Core.Component do
-  defp parse_specs(block, casts, calls, system, legit) do
-    case block do
-      [{:@, _, [{:doc, _, [docstring]}]},
-       {:@, _, [{:cast, _, [fun]}]}
-        |rest] ->
-        cast = %Cast{Cast.parse(fun)|doc: docstring}
-        parse_specs(rest, [cast|casts], calls, system, legit)
-      [{:@, _, [{:doc, _, [docstring]}]},
-       {:@, _, [{:call, _, [fun]}]}
-        |rest] ->
-        call = %Call{Call.parse(fun)|doc: docstring}
-        parse_specs(rest, casts, [call|calls], system, legit)
-      [{:@, _, [{:cast, _, [fun]}]}
-        |rest] ->
-        cast = Cast.parse(fun)
-        parse_specs(rest, [cast|casts], calls, system, legit)
-      [{:@, _, [{:call, _, [fun]}]}
-        |rest] ->
-        call = Call.parse(fun)
-        parse_specs(rest, casts, [call|calls], system, legit)
-      [{:@, _, [{:system, _, [mod]}]}
-        |rest] ->
-        parse_specs(rest, casts, calls, mod, legit)
-      [x|rest] ->
-        parse_specs(rest, casts, calls, system, [x|legit])
-      [] -> {casts, calls, system, Enum.reverse(legit)}
-    end
-  end
+alias Lkn.Core.Specs
 
+defmodule Lkn.Core.Component do
   defp cast_client(module_name, cast) do
     name = cast.fun.name
     entity_key_type = quote do
@@ -125,13 +98,13 @@ defmodule Lkn.Core.Component do
     end
   end
 
-  defmacro defspecs(name, do: block) do
+  defmacro defcomponent(name, do: block) do
     block = case block do
               {:__block__, _, x} -> x
               x -> [x]
             end
 
-    {casts, calls, system, legit} = parse_specs(block, [], [], :none, [])
+    {casts, calls, legit} = Specs.parse_specs(block, [], [], [])
 
     casts_client = Enum.map(casts, &(cast_client(name, &1)))
     calls_client = Enum.map(calls, &(call_client(name, &1)))
@@ -148,7 +121,7 @@ defmodule Lkn.Core.Component do
         unquote(calls_behaviour)
 
         def system do
-          unquote(system)
+          @system
         end
 
         defmacro __using__(_) do
