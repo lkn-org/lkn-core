@@ -342,14 +342,16 @@ end
 ######################################################################
 #                                MAP                                 #
 #                                                                    #
+import Lkn.Core.Map
+
 defmodule Test.Map.Component do
   use Test.System.Map
 
   def level_max(_), do: 7
 end
 
-defmodule Test.Map do
-  use Lkn.Core.Entity, components: [Test.Map.Component]
+defmap Test.Map do
+  @components [Test.Map.Component]
 
   def start_link(key, delay \\ Option.some(100)) do
     Lkn.Core.Entity.start_link(__MODULE__, key, delay)
