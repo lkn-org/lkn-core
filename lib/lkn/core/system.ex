@@ -26,6 +26,7 @@ defmodule Lkn.Core.System do
   alias Lkn.Core.Name
   alias Lkn.Core.Puppet
   alias Lkn.Core.System
+  alias Lkn.Core.Instance
 
   @type m :: module
   @type puppets :: MapSet.t(Puppet.t)
@@ -216,11 +217,13 @@ defmodule Lkn.Core.System do
       name: Name.system(instance_key, module))
   end
 
+  @doc false
   @spec cast(Instance.k, System.m, term) :: :ok
   def cast(instance_key, system, cmd) do
     GenServer.cast(Name.system(instance_key, system), {:pub, cmd})
   end
 
+  @doc false
   @spec call(Instance.k, System.m, term) :: any
   def call(instance_key, system, cmd) do
     GenServer.call(Name.system(instance_key, system), {:pub, cmd})
