@@ -12,8 +12,8 @@ defmodule Lkn.Core.Specs do
     casts_client = Enum.map(casts, &(cast_client(key_type, key_to_name, &1)))
     calls_client = Enum.map(calls, &(call_client(key_type, key_to_name, &1)))
 
-    casts_behaviour = Enum.map(casts, &(cast_behaviour(&1, state_type)))
-    calls_behaviour = Enum.map(calls, &(call_behaviour(&1, state_type)))
+    casts_behaviour = Enum.map(casts, &(cast_behaviour(&1, key_type, state_type)))
+    calls_behaviour = Enum.map(calls, &(call_behaviour(&1, key_type, state_type)))
 
     quote do
       unquote(legit)
@@ -70,13 +70,10 @@ defmodule Lkn.Core.Specs do
     end
   end
 
-  defp cast_behaviour(cast, state_type) do
+  defp cast_behaviour(cast, key_type, state_type) do
     name = cast.fun.name
-    entity_key_type = quote do
-      Lkn.Core.Entity.k
-    end
 
-    arglistcl = [{:::, [], [{:entity_key, [], nil}, entity_key_type]}
+    arglistcl = [{:::, [], [{:key, [], nil}, key_type]}
                  |Enum.map(cast.fun.arguments, &({:::, [], [&1.name, &1.type]}))] ++ [
       {:::, [], [{:state, [], nil}, state_type]}
     ]
@@ -86,13 +83,10 @@ defmodule Lkn.Core.Specs do
     end
   end
 
-  defp call_behaviour(call, state_type) do
+  defp call_behaviour(call, key_type, state_type) do
     name = call.fun.name
-    entity_key_type = quote do
-      Lkn.Core.Entity.k
-    end
 
-    arglistcl = [{:::, [], [{:entity_key, [], nil}, entity_key_type]}
+    arglistcl = [{:::, [], [{:key, [], nil}, key_type]}
                  |Enum.map(call.fun.arguments, &({:::, [], [&1.name, &1.type]}))] ++ [
       {:::, [], [{:state, [], nil}, state_type]}
     ]
