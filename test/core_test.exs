@@ -283,8 +283,10 @@ end
 ######################################################################
 #                              SYSTEM                                #
 #                                                                    #
-
-import Lkn.Core.Component
+import Lkn.Core.Component, only: [defcomponent: 2]
+import Lkn.Core.Map, only: [defmap: 2]
+import Lkn.Core.Puppeteer, only: [defpuppeteer: 2]
+import Lkn.Core.Puppet, only: [defpuppet: 2]
 
 defcomponent Test.System.Puppet do
   @system Test.System
@@ -319,18 +321,19 @@ defmodule Test.System do
   end
 
   def puppet_enter(:ok, _entities, key) do
-    notify(&(Test.Puppeteer.emit(&1, {:enter, key})))
+    notify(&(Test.Puppeteer.Specs.emit(&1, {:enter, key})))
     :ok
   end
 
   def puppet_leave(:ok, _entities, key) do
-    notify(&(Test.Puppeteer.emit(&1, {:leave, key})))
+    notify(&(Test.Puppeteer.Specs.emit(&1, {:leave, key})))
     :ok
   end
 
   def system_cast({:level_up, entity_key}, _entities, :ok) do
     notif = Test.System.Puppet.level_up(entity_key)
-    notify(&(Test.Puppeteer.emit(&1, {:level_up, notif})))
+
+    notify(&(Test.Puppeteer.Specs.emit(&1, {:level_up, notif})))
 
     :ok
   end
@@ -343,12 +346,12 @@ end
 ######################################################################
 #                                MAP                                 #
 #                                                                    #
-import Lkn.Core.Map
-
 defmodule Test.Map.Component do
   use Test.System.Map
 
-  def level_max(_), do: 7
+  def level_max(_, _), do: 7
+
+  def init_state(_), do: {:ok, :ok}
 end
 
 defmap Test.Map do
@@ -374,16 +377,16 @@ end
 defmodule Test.Entity.Component do
   use Test.System.Puppet
 
-  def level_up(entity_key) do
+  def init_state(_), do: {:ok, :ok}
+
+  def level_up(entity_key, :ok) do
     Option.some(lvl) = read(entity_key, :level)
 
     write(entity_key, :level, lvl + 1)
 
-    {lvl, lvl + 1}
+    {{lvl, lvl + 1}, :ok}
   end
 end
-
-import Lkn.Core.Puppet
 
 defpuppet Test.Entity do
   @components [Test.Entity.Component]
@@ -412,8 +415,13 @@ end
 ######################################################################
 #                             PUPPETEER                              #
 #                                                                    #
+
+defpuppeteer Test.Puppeteer.Specs do
+  @cast emit(msg :: any)
+end
+
 defmodule Test.Puppeteer do
-  use Puppeteer, state: pid()
+  use Test.Puppeteer.Specs, state: pid()
 
   def start_link(puppeteer_key) do
     Puppeteer.start_link(__MODULE__, puppeteer_key, self())
@@ -428,18 +436,9 @@ defmodule Test.Puppeteer do
     target
   end
 
-  def puppeteer_handle_cast({:emit, msg}, target) do
-    send(target, msg)
-
+  def emit(_puppeteer_key, msg, target) do
+    send target, msg
     target
-  end
-
-  def handle_message(target, _msg) do
-    target
-  end
-
-  def emit(puppeteer_key, msg) do
-    cast(puppeteer_key, {:emit, msg})
   end
 end
 

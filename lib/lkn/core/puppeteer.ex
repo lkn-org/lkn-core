@@ -18,6 +18,7 @@
 defmodule Lkn.Core.Puppeteer do
   alias Lkn.Core.Instance
   alias Lkn.Core.Name
+  alias Lkn.Core.Specs
 
   @typedoc """
   A key to identify and reach a given Puppeteer.
@@ -30,94 +31,93 @@ defmodule Lkn.Core.Puppeteer do
   @type m :: module
 
   @type init_args :: any
+
   @type state :: any
 
-  defmacro __using__(state: state_t) do
+  defmacro defpuppeteer(name, do: block) do
+    state_type = quote do Lkn.Core.Puppeteer.state end
+    key_type = quote do Lkn.Core.Puppeteer.k end
+    key_to_name = &(Lkn.Core.Name.puppeteer(&1))
+
     quote do
-      use Lkn.Prelude
-      use GenServer
+      defmodule unquote(name) do
+        unquote(Specs.gen_server_from_specs(block, key_type, key_to_name, state_type))
 
-      alias Lkn.Core.Instance
-      alias Lkn.Core, as: L
+        defmacro __using__(_) do
+          quote do
+            @behaviour unquote(__MODULE__)
+            @behaviour Lkn.Core.Puppeteer
 
-      @type state :: unquote(state_t)
+            use GenServer
 
-      defmodule State do
-        @moduledoc false
+            alias Lkn.Core.Instance
+            alias Lkn.Core, as: L
 
-        defstruct [
-          :puppeteer_key,
-          :map_key,
-          :instance_key,
-          :state,
-        ]
+            defmodule State do
+              @moduledoc false
 
-        @type t :: %State{
-          puppeteer_key: Puppeteer.k,
-          instance_key:  Lkn.Prelude.Option.t(Instance.k),
-          map_key:       Lkn.Prelude.Option.t(L.Map.k),
-          state:         unquote(state_t),
-        }
+              defstruct [
+                :puppeteer_key,
+                :map_key,
+                :instance_key,
+                :state,
+              ]
 
-        @spec new(Puppeteer.t, unquote(state_t)) :: t
-        def new(pk, s) do
-          %State{
-            puppeteer_key: pk,
-            instance_key:  Lkn.Prelude.Option.nothing(),
-            map_key:       Lkn.Prelude.Option.nothing(),
-            state:         s,
-          }
+              @type t :: %State{
+                puppeteer_key: Puppeteer.k,
+                instance_key:  Lkn.Prelude.Option.t(Instance.k),
+                map_key:       Lkn.Prelude.Option.t(L.Map.k),
+                state:         Lkn.Core.Puppeteer.state,
+              }
+
+              @spec new(Puppeteer.t, Lkn.Core.Puppeteer.state) :: t
+              def new(pk, s) do
+                %State{
+                  puppeteer_key: pk,
+                  instance_key:  Lkn.Prelude.Option.nothing(),
+                  map_key:       Lkn.Prelude.Option.nothing(),
+                  state:         s,
+                }
+              end
+            end
+
+            def init({puppeteer_key, args}) do
+              {:ok, s} = init_state(args)
+              {:ok, State.new(puppeteer_key, s)}
+            end
+
+            def handle_cast({:leave_instance, instance_key}, state) do
+              if state.instance_key == Lkn.Prelude.Option.some(instance_key) do
+                s2 = leave_instance(state.state, instance_key)
+
+                Instance.unregister_puppeteer(instance_key, state.puppeteer_key)
+
+                {:noreply, %State{state|instance_key: Lkn.Prelude.Option.nothing(), state: s2}}
+              else
+                {:noreply, state}
+              end
+            end
+            def handle_cast({:spec, {name, args}}, state) do
+              s = :erlang.apply(__MODULE__, name, [state.puppeteer_key|args]++[state.state])
+
+              {:noreply, %State{state|state: s}}
+            end
+
+            def handle_call({:find_instance, map_key}, _from, state) do
+              instance_key = Lkn.Core.Pool.register_puppeteer(map_key, state.puppeteer_key, __MODULE__)
+
+              state = %State{state|instance_key: Lkn.Prelude.Option.some(instance_key)}
+
+              {:reply, instance_key, state}
+            end
+            def handle_call({:spec, {name, args}}, _call, state) do
+              {res, s} = :erlang.apply(__MODULE__, name, [state.puppeteer_key|args] ++ [state.state])
+
+              {:reply, res, %State{state|state: s}}
+            end
+          end
         end
       end
-
-      def init({puppeteer_key, args}) do
-        {:ok, s} = init_state(args)
-        {:ok, State.new(puppeteer_key, s)}
-      end
-
-      def handle_cast({:leave_instance, instance_key}, state) do
-        if state.instance_key == Lkn.Prelude.Option.some(instance_key) do
-          s2 = leave_instance(state.state, instance_key)
-
-          Instance.unregister_puppeteer(instance_key, state.puppeteer_key)
-
-          {:noreply, %State{state|instance_key: Lkn.Prelude.Option.nothing(), state: s2}}
-        else
-          {:noreply, state}
-        end
-      end
-      def handle_cast({:specific, msg}, state) do
-        s2 = puppeteer_handle_cast(msg, state.state)
-        {:noreply, %State{state|state: s2}}
-      end
-
-      def handle_call({:find_instance, map_key}, _from, state) do
-        instance_key = Lkn.Core.Pool.register_puppeteer(map_key, state.puppeteer_key, __MODULE__)
-
-        state = %State{state|instance_key: Lkn.Prelude.Option.some(instance_key)}
-
-        {:reply, instance_key, state}
-      end
-
-      def puppeteer_handle_cast(_msg, state) do
-        state
-      end
-
-      def handle_info(msg, state) do
-        state = %State{state|state: handle_message(state.state, msg)}
-
-        {:noreply, state}
-      end
-
-      def cast(puppeteer_key, msg) do
-        GenServer.cast(Name.puppeteer(puppeteer_key), {:specific, msg})
-      end
-
-      @behaviour Lkn.Core.Puppeteer
-
-      defoverridable [
-        puppeteer_handle_cast: 2,
-      ]
     end
   end
 
@@ -126,7 +126,6 @@ defmodule Lkn.Core.Puppeteer do
     GenServer.start_link(module, {puppeteer_key, args}, name: Name.puppeteer(puppeteer_key))
   end
 
-  @callback handle_message(state, any) :: state
   @callback init_state(init_args) :: {:ok, state}|:error
   @callback leave_instance(state, Instance.k) :: state
 

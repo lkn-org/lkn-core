@@ -15,110 +15,23 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-alias Lkn.Core.Specs
-
 defmodule Lkn.Core.Component do
-  defp cast_client(module_name, cast) do
-    name = cast.fun.name
-    entity_key_type = quote do
-      Lkn.Core.Entity.k
-    end
+  alias Lkn.Core.Specs
 
-    cast_doc = if cast.doc != :none do
-      quote do
-        @doc unquote(cast.doc)
-      end
-    end
+  @type state :: any
 
-    arglist = Enum.map(cast.fun.arguments, &(&1.name))
-    arglistcl = [{:entity_key, [], nil}|arglist]
-    argtypes = [entity_key_type|Enum.map(cast.fun.arguments, &(&1.type))]
-
-    quote do
-      unquote(cast_doc)
-      @spec unquote({name, [], argtypes}) :: :ok
-      def unquote({name, [], arglistcl}) do
-        GenServer.cast(Lkn.Core.Name.component(unquote({:entity_key, [], nil}), unquote(module_name)),
-                       {:spec, {unquote(name), unquote(arglist)}})
-      end
-    end
-  end
-
-  defp call_client(module_name, call) do
-    name = call.fun.name
-    entity_key_type = quote do
-      Lkn.Core.Entity.k
-    end
-
-    call_doc = if call.doc != :none do
-      quote do
-        @doc unquote(call.doc)
-      end
-    end
-
-    arglist = Enum.map(call.fun.arguments, &(&1.name))
-    arglistcl = [{:entity_key, [], nil}|arglist]
-    argtypes = [entity_key_type|Enum.map(call.fun.arguments, &(&1.type))]
-
-    quote do
-      unquote(call_doc)
-      @spec unquote({name, [], argtypes}) :: unquote(call.ret)
-      def unquote({name, [], arglistcl}) do
-        GenServer.call(Lkn.Core.Name.component(unquote({:entity_key, [], nil}), unquote(module_name)),
-                       {:spec, {unquote(name), unquote(arglist)}})
-      end
-    end
-  end
-
-  defp cast_behaviour(cast) do
-    name = cast.fun.name
-    entity_key_type = quote do
-      Lkn.Core.Entity.k
-    end
-
-    arglistcl = [{:::, [], [{:entity_key, [], nil}, entity_key_type]}
-                 |Enum.map(cast.fun.arguments, &({:::, [], [&1.name, &1.type]}))]
-
-    quote do
-      @callback unquote({name, [], arglistcl}) :: :ok
-    end
-  end
-
-  defp call_behaviour(call) do
-    name = call.fun.name
-    entity_key_type = quote do
-      Lkn.Core.Entity.k
-    end
-
-    arglistcl = [{:::, [], [{:entity_key, [], nil}, entity_key_type]}
-                 |Enum.map(call.fun.arguments, &({:::, [], [&1.name, &1.type]}))]
-
-    quote do
-      @callback unquote({name, [], arglistcl}) :: unquote(call.ret)
-    end
-  end
+  @callback init_state(Lkn.Core.Entity.k) :: {:ok, state} | :error
 
   defmacro defcomponent(name, do: block) do
-    block = case block do
-              {:__block__, _, x} -> x
-              x -> [x]
-            end
-
-    {casts, calls, legit} = Specs.parse_specs(block, [], [], [])
-
-    casts_client = Enum.map(casts, &(cast_client(name, &1)))
-    calls_client = Enum.map(calls, &(call_client(name, &1)))
-
-    casts_behaviour = Enum.map(casts, &(cast_behaviour(&1)))
-    calls_behaviour = Enum.map(calls, &(call_behaviour(&1)))
+    state_type = quote do Lkn.Core.Component.state end
+    key_type = quote do Lkn.Core.Component.k end
+    key_to_name = quote do
+      &(Lkn.Core.Name.component(&1, unquote(name)))
+    end
 
     quote do
       defmodule unquote(name) do
-        unquote(legit)
-        unquote(casts_client)
-        unquote(calls_client)
-        unquote(casts_behaviour)
-        unquote(calls_behaviour)
+        unquote(Specs.gen_server_from_specs(block, key_type, key_to_name, state_type))
 
         def system do
           @system
@@ -126,7 +39,20 @@ defmodule Lkn.Core.Component do
 
         defmacro __using__(_) do
           quote do
+            defmodule State do
+              defstruct [
+                :entity_key,
+                :state,
+              ]
+
+              @type t :: %State{
+                entity_key: Lkn.Core.Entity.k,
+                state: Lkn.Core.Component.state,
+              }
+            end
+
             @behaviour unquote(__MODULE__)
+            @behaviour Lkn.Core.Component
 
             use GenServer
 
@@ -143,6 +69,11 @@ defmodule Lkn.Core.Component do
               GenServer.start_link(__MODULE__, entity_key, name: Name.component(entity_key, unquote(__MODULE__)))
             end
 
+            def init(entity_key) do
+              {:ok, s} = init_state(entity_key)
+              {:ok, %State{entity_key: entity_key, state: s}}
+            end
+
             @spec read(Entity.k, Properties.prop) :: Option.t(Properties.value)
             defp read(entity_key, p) do
               Properties.read(entity_key, p)
@@ -153,16 +84,16 @@ defmodule Lkn.Core.Component do
               Properties.write(entity_key, p, v)
             end
 
-            def handle_cast({:spec, {name, args}}, entity_key) do
-              :erlang.apply(__MODULE__, name, [entity_key|args])
+            def handle_cast({:spec, {name, args}}, state) do
+              s = :erlang.apply(__MODULE__, name, [state.entity_key|args] ++ [state.state])
 
-              {:noreply, entity_key}
+              {:noreply, %State{state|state: s}}
             end
 
-            def handle_call({:spec, {name, args}}, _call, entity_key) do
-              res = :erlang.apply(__MODULE__, name, [entity_key|args])
+            def handle_call({:spec, {name, args}}, _call, state) do
+              {res, s} = :erlang.apply(__MODULE__, name, [state.entity_key|args] ++ [state.state])
 
-              {:reply, res, entity_key}
+              {:reply, res, %State{state|state: s}}
             end
           end
         end
