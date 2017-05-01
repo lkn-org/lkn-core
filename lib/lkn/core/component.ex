@@ -24,15 +24,22 @@ defmodule Lkn.Core.Component do
 
   defmacro defcomponent(name, do: block) do
     state_type = quote do Lkn.Core.Component.state end
-    key_type = quote do Lkn.Core.Component.k end
+    key_type = quote do Lkn.Core.Entity.k end
     key_to_name = quote do
       &(Lkn.Core.Name.component(&1, unquote(name)))
     end
 
     quote do
       defmodule unquote(name) do
-        unquote(Specs.gen_server_from_specs(block, key_type, key_to_name, state_type))
+        unquote(Specs.gen_server_from_specs(
+              block,
+              key_type,
+              key_to_name,
+              state_type,
+              key_name: Specs.var_name("entity_key"),
+            ))
 
+        @doc false
         def system do
           @system
         end

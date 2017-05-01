@@ -285,8 +285,9 @@ end
 #                                                                    #
 import Lkn.Core.Component, only: [defcomponent: 2]
 import Lkn.Core.Map, only: [defmap: 2]
-import Lkn.Core.Puppeteer, only: [defpuppeteer: 2]
 import Lkn.Core.Puppet, only: [defpuppet: 2]
+import Lkn.Core.Puppeteer, only: [defpuppeteer: 2]
+import Lkn.Core.System, only: [defsystem: 2]
 
 defcomponent Test.System.Puppet do
   @system Test.System
@@ -306,11 +307,9 @@ defcomponent Test.System.Map do
   @call level_max() :: number
 end
 
-defmodule Test.System do
-  use Lkn.Core.System,
-    state: :ok,
-    puppet_component: Test.System.Puppet,
-    map_component: Test.System.Map
+defsystem Test.System do
+  @puppet Test.System.Puppet
+  @map Test.System.Map
 
   def init_state(_map_key) do
     :ok
@@ -330,16 +329,11 @@ defmodule Test.System do
     :ok
   end
 
-  def system_cast({:level_up, entity_key}, _entities, :ok) do
-    notif = Test.System.Puppet.level_up(entity_key)
-
+  cast level_up(puppet_key :: Puppet.k) do
+    notif = Test.System.Puppet.level_up(puppet_key)
     notify(&(Test.Puppeteer.Specs.emit(&1, {:level_up, notif})))
 
-    :ok
-  end
-
-  def level_up(key, entity_key) do
-    cast(key, {:level_up, entity_key})
+    state
   end
 end
 
