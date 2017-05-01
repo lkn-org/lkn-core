@@ -46,8 +46,25 @@ defmodule Lkn.Core.Entity do
   alias Lkn.Core.Name
   alias Lkn.Core.Properties
 
+  @typedoc """
+  A property of the Entity, e.g. its health point, its current speed, etc.
+  """
+  @type prop :: any
+
+  @typedoc """
+  A value associated to a given Entity's property.
+  """
+  @type value :: any
+
   @moduledoc """
   A behaviour module for implementing an Entity.
+
+  **Note:** An Entity can either be a Map or a Puppet. To actually
+    implement an Entity, you should use either
+    `Lkn.Core.Puppet.defpuppet/2` or `Lkn.Core.Map.defmap/2`. In other
+    words, if your code contains `@behaviour Lkn.Core.Entity`, you are
+    doing it wrong. From a developer point of view, only the
+    `start_link/3` function is really useful.
   """
 
   @typedoc """
@@ -55,9 +72,19 @@ defmodule Lkn.Core.Entity do
   `Lkn.Core.Puppet` or a `Lkn.Core.Map`.
   """
   @type k :: Lkn.Core.Map.k | Lkn.Core.Puppet.k
+
+  @typedoc """
+  The third argument of the `start_link/3` function which is passed to
+  the `init_properties/1` callback.
+  """
   @type init_args :: any
 
-  @callback init_properties(init_args) :: map
+  @doc """
+  Initializes the Entity's map of properties.
+
+  This map is used by
+  """
+  @callback init_properties(init_args) :: %{prop => value}
 
   defmacro __using__(components: comps) do
     quote location: :keep do
@@ -81,22 +108,33 @@ defmodule Lkn.Core.Entity do
     end
   end
 
+  @doc """
+  Starts an Entity process linked to the current process.
+  """
   @spec start_link(module, k, init_args) :: Supervisor.on_start
   def start_link(module, key, args) do
     Supervisor.start_link(module, [key: key, args: args], name: Name.entity(key))
   end
 
+  @doc false
   @spec has_component?(k, System.m) :: boolean
   def has_component?(key, sys) do
     Agent.get(Lkn.Core.Name.comps_list(key), &Enum.member?(&1, sys))
   end
 
+  @doc false
   @spec systems(k) :: [System.m]
   def systems(key) do
     Agent.get(Lkn.Core.Name.comps_list(key), fn r -> r end)
   end
 
-  @spec read(k, Lkn.Core.Properties.prop) :: Option.t(Lkn.Core.Properties.value)
+  @doc """
+  Retreive the current value of the given property, if it exists.
+
+  There is no `write` counterpart, because only a `Component` can
+  modify it.
+  """
+  @spec read(k, prop) :: Option.t(value)
   def read(key, prop) do
     Lkn.Core.Properties.read(key, prop)
   end

@@ -18,25 +18,14 @@
 defmodule Lkn.Core.Properties do
   use Lkn.Prelude
 
-  @moduledoc """
-  Underlying properties of an `Lkn.Entity`.
-  """
-
-  @type prop :: any
-  @type value :: any
+  @moduledoc false
 
   @spec start_link(map, Lkn.Core.Entity.k) :: Agent.on_start
-  @doc """
-  Start a new Agent for the Entity identified as `key`.
-  """
   def start_link(content, entity_key) do
     Agent.start_link(fn -> content end, name: Lkn.Core.Name.properties(entity_key))
   end
 
-  @spec read(Lkn.Core.Entity.k, prop) :: Option.t(value)
-  @doc """
-  Read the value of the given `prop`.
-  """
+  @spec read(Lkn.Core.Entity.k, Lkn.Core.Entity.prop) :: Option.t(Lkn.Core.Entity.value)
   def read(entity_key, prop) do
     case Agent.get(Lkn.Core.Name.properties(entity_key), &Map.fetch(&1, prop)) do
       {:ok, val} -> Option.some(val)
@@ -44,10 +33,7 @@ defmodule Lkn.Core.Properties do
     end
   end
 
-  @spec write(Lkn.Core.Entity.k, prop, value) :: :ok
-  @doc """
-  Update the value of the given `prop`.
-  """
+  @spec write(Lkn.Core.Entity.k, Lkn.Core.Entity.prop, Lkn.Core.Entity.value) :: :ok
   def write(entity_key, prop, v) do
     Agent.update(Lkn.Core.Name.properties(entity_key), &Map.put(&1, prop, v))
   end
