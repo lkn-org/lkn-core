@@ -311,7 +311,7 @@ defsystem Test.System do
   @puppet Test.System.Puppet
   @map Test.System.Map
 
-  def init_state(_map_key) do
+  def init_state(_instance_key, _map_key) do
     :ok
   end
 
@@ -319,12 +319,12 @@ defsystem Test.System do
     Lkn.Core.System.start_link(__MODULE__, instance_key, map_key)
   end
 
-  def puppet_enter(:ok, _entities, key) do
+  def puppet_enter(:ok, _instance_key, _map_key, _entities, key) do
     notify(&(Test.Puppeteer.Specs.emit(&1, {:enter, key})))
     :ok
   end
 
-  def puppet_leave(:ok, _entities, key) do
+  def puppet_leave(:ok, _instance_key, _map_key, _entities, key) do
     notify(&(Test.Puppeteer.Specs.emit(&1, {:leave, key})))
     :ok
   end

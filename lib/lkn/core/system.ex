@@ -17,7 +17,99 @@
 #
 defmodule Lkn.Core.System do
   @moduledoc """
-  A behaviour module for implementing a System.
+  A behaviour module for implementing and querying a System.
+
+  **Note:** You are not supposed to spawn a System yourself. The
+    `Lkn.Core.Instance` takes care of that for you. This is why you
+    will not find any `start*` function here.
+
+  The core of this module is the `defsystem/2` macro. It is the
+  recommended way to implement of System, that is a Process that
+  handles one aspect of the gameplay. Before we going any further,
+  lets have a look at a following minimal example.
+
+      defsystem Sys do
+        # 1. Specify which 'Component's are required by this 'System'.
+        @map Sys.MapSpec
+        @puppet Sys.PuppetSpec
+
+        # 2. Implementation of the 'System' callbacks.
+        def init_state(_instance_key, _map_key) do
+          # return some state
+        end
+
+        def puppet_enter(state, _instance_key, _map_key, _puppets, _puppet_key)
+          # we do nothing, but we could
+          state
+        end
+
+        def puppet_leave(state, _instance_key, _map_key, _puppets, _puppet_key)
+          # we do nothing, but we could
+          state
+        end
+
+        # 3. Define some specific functions
+        cast func1(a :: integer, b :: boolean) do
+          # here you can use 'a' and 'b', but also 'state',
+          # 'puppets', 'map_key' and 'instance_key'
+
+          # you have to return the new state value
+          state
+        end
+      end
+
+  ## Map and Puppet Components
+
+  A System handles one facet of the gameplay. Its purpose is to
+  manipulate the set of “compatible” of Puppets. A System is tied to
+  two Component Specification Modules (that is two modules defined
+  with the `Lkn.Core.Component.defcomponent/2` macro). A Component is
+  a Proxy to manipulate an Entity. It abstracts away its underlying
+  structure and expose a common interface. See `Lkn.Core.Component` to
+  learn how to specify then implement a Component.
+
+  To define which Component is required for a Map and which one is
+  required for a Puppet, we use the `@map` and `@puppet` annotations.
+
+  ## The System Behaviour
+
+  The System callbacks can be divided into two categories. The
+  `init_map/2` function is called only one time to initialize the
+  inner state of the System. This state implementation is at the
+  discretion of the developer. The other callbacks are a set of hooks
+  which are called when a particular event occures.
+
+  ## The `cast` Keyword
+
+  In addition to the System callbacks which are shared by all the
+  Systems, each System exposes a public interface the Puppeteer can
+  use to actually play. The function interface are defined using the
+  `cast` keyword.
+
+  You can use the `cast` keyword as follows: `cast
+  <func_name>([arg_name :: arg_type]*) do <block> end`. Inside the
+  block, you can use the arguments you have defined. In addition, you
+  also can use the following variables:
+
+  - `state` is the current state of the System, as initialized by
+    `init_state/2` and modified by the System callbacks and functions
+  - `instance_key` is the key to identify the Instance which spawns
+    the system, it can be used to reach its other systems
+  - `map_key` is the key to identify the map on which the puppets have
+    been spawned
+  - `puppets` is a `MapSet` of all the Puppets currently in the
+    Instance and “compatible” with the System
+
+  In addition to this variables, you also can use the `notify/1`
+  function. It takes a lambda of types `(Lkn.Core.Puppeteer.k ->
+  any)`. It can be used to reach all the Puppeteers that have
+  populated the Instance with their Puppets.
+
+  The block has to return the new system state.
+
+  The `defsystem` will generate a client function to use this
+  function. In addition to the specified arguments, it takes an
+  additional one: an Instance key.
   """
 
   use Lkn.Prelude
@@ -28,7 +120,10 @@ defmodule Lkn.Core.System do
   alias Lkn.Core.System
   alias Lkn.Core.Instance
 
+  @typedoc "A System defined using the `defsystem/2` macro."
   @type m :: module
+
+  @typedoc "A set of “compatible” puppets."
   @type puppets :: MapSet.t(Puppet.t)
 
   defmodule State do
@@ -86,11 +181,44 @@ defmodule Lkn.Core.System do
     end
   end
 
+  @typedoc """
+  The inner state of the Server process.
+  """
   @type state :: any
-  @callback init_state(Map.k) :: state
-  @callback puppet_enter(state, System.puppets, Puppet.k) :: state
-  @callback puppet_leave(state, System.puppets, Puppet.k) :: state
 
+  @doc """
+  Initialize the state of the system.
+
+  With the `instance_key`, you can trigger other systems of the same
+  instance. With the `map_key`, you can request through the Map
+  Component some information about the map.
+  """
+  @callback init_state(instance_key :: Instance.k, map_key :: Map.k) :: state
+
+  @doc """
+  A hook function which is called when a “compatible” puppet enters the Instance.
+  """
+  @callback puppet_enter(
+    state :: state,
+    instance_key :: Instance.k,
+    map_key :: Map.k,
+    puppets :: System.puppets,
+    puppet_key :: Puppet.k) :: state
+
+  @doc """
+  A hook function which is called when a “compatible” puppet leaves the Instance.
+  """
+  @callback puppet_leave(
+    state :: state,
+    instance_key :: Instance.k,
+    map_key :: Map.k,
+    puppets :: System.puppets,
+    puppet_key :: Puppet.k) :: state
+
+  @doc """
+  A macro to ease the definition of a new System which provides the
+  [cast](#module-the-keyword) keyword.
+  """
   defmacro defsystem(name, do: block) do
     alias Lkn.Core.Specs
 
@@ -141,7 +269,7 @@ defmodule Lkn.Core.System do
         end
         defp priv_handle_cast({:register_puppet, entity_key}, priv: priv, pub: pub) do
           {priv, pub} = if Lkn.Core.Entity.has_component?(entity_key, __MODULE__) do
-            {State.put(priv, entity_key), puppet_enter(pub, priv.puppets, entity_key)}
+            {State.put(priv, entity_key), puppet_enter(pub, priv.instance_key, priv.map_key, priv.puppets, entity_key)}
           else
             {priv, pub}
           end
@@ -152,7 +280,7 @@ defmodule Lkn.Core.System do
           {priv, pub} =
           if Lkn.Core.Entity.has_component?(entity_key, __MODULE__) do
             priv = State.delete(priv, entity_key)
-            {priv, puppet_leave(pub, priv.puppets, entity_key)}
+            {priv, puppet_leave(pub, priv.instance_key, priv.map_key, priv.puppets, entity_key)}
           else
             {priv, pub}
           end
@@ -192,39 +320,34 @@ defmodule Lkn.Core.System do
     end
   end
 
-  @spec start_link(System.m, Instance.k, Map.k) :: GenServer.on_start
+  @doc false
+  @spec start_link(m, Instance.k, Map.k) :: GenServer.on_start
   def start_link(module, instance_key, map_key) do
     GenServer.start_link(module,
       [
         priv: State.new(instance_key, map_key),
-        pub: module.init_state(map_key),
+        pub: module.init_state(instance_key, map_key),
       ],
       name: Name.system(instance_key, module))
   end
 
   @doc false
-  @spec cast(Instance.k, System.m, term) :: :ok
-  def cast(instance_key, system, cmd) do
-    GenServer.cast(Name.system(instance_key, system), {:pub, cmd})
-  end
-
-  @doc false
-  @spec call(Instance.k, System.m, term) :: any
-  def call(instance_key, system, cmd) do
-    GenServer.call(Name.system(instance_key, system), {:pub, cmd})
-  end
-
-  @spec register_puppet(Instance.k, System.m, Puppet.k) :: :ok
+  @spec register_puppet(Instance.k, m, Puppet.k) :: :ok
   def register_puppet(instance_key, system, puppet_key) do
     GenServer.cast(Name.system(instance_key, system), {:priv, {:register_puppet, puppet_key}})
   end
 
-  @spec unregister_puppet(Instance.k, System.m, Puppet.k) :: :ok
+  @doc false
+  @spec unregister_puppet(Instance.k, m, Puppet.k) :: :ok
   def unregister_puppet(instance_key, system, puppet_key) do
     GenServer.cast(Name.system(instance_key, system), {:priv, {:unregister_puppet, puppet_key}})
   end
 
-  @spec population_size(Instance.k, module) :: integer
+  @doc """
+  Returns the number of “compatible” Puppets of a given System
+  registered to a given Instance.
+  """
+  @spec population_size(Instance.k, m) :: integer
   def population_size(instance_key, system) do
     GenServer.call(Name.system(instance_key, system), {:priv, :population_size})
   end
