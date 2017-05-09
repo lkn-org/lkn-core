@@ -18,10 +18,91 @@
 defmodule Lkn.Core.Component do
   alias Lkn.Core.Specs
 
+  @moduledoc """
+  A behaviour module for implementing a Component which abstracts away
+  an Entity.
+
+  A Component is a Process which acts as a Proxy between an Entity
+  (either a Puppet or a Map) and a System. It provides an unified
+  interface the latter can use to modify the former. Thanks to this
+  abstraction, the underlying structure of the Entity does not matter.
+
+  The core of this module is the `defcomponent/2` macro. This macro
+  has to be used to define a Component *specification*. A Component
+  Specification is itself a behaviour module: it defines the Component
+  interface concrete implementation will have to satisfy.
+
+  Before defining a System (see `Lkn.Core.System` for more explanation
+  on how this can be done, and more precisely
+  `Lkn.Core.System.defsystem/2`), we need to define two
+  Specifications. One for the Map and one for the Puppets. Here is an
+  example.
+
+      defcomponent Sys.Puppet do
+        # 1. first, we need to specify the related System
+        @system System.Chat
+
+        # 2. We can define GenServer call-like functions which returns a
+        #    result
+        @call fun1(x :: number) :: boolean
+
+        # 3: And we can define GenServer cast-like functions which are
+        #    not blocking
+        @cast fun2(y :: String.t, z :: any)
+      end
+
+  The resulting module is a behaviour module which also implements the
+  `__using__` macro. The concrete implementation of this Component
+  specification can be written as follows:
+
+      defmodule Puppet.Sys do
+        use Sys.Puppet
+
+        def init_state(entity_key) od
+          # ...
+          {:ok, state}
+        end
+
+        def fun1(entity_key, x, state) do
+          # ...
+          {true, state}
+        end
+
+        def fun2(entity_key, y, z, state) do
+          # ...
+          state
+        end
+      end
+
+  Do not hesitate to generate the documentation in order to see the
+  look of the generated Behaviour.
+
+  Basically, for a GenServer cast-like function, the handler takes two
+  arguments in addition to the ones written in the prototype: before,
+  the underlying Entity key, after the Component dynamic state. It
+  returns the new state once its job is done. It is exactly the same
+  thing for a call, expect it returns a tuple `{res, new_state}`.
+  """
+
+  @typedoc """
+  The inner state of a Component.
+
+  It can makes sense that a given Component carries a state. The main
+  idea is to have a dynamic state which is not persistent across
+  server restarts.
+  """
   @type state :: any
 
-  @callback init_state(Lkn.Core.Entity.k) :: {:ok, state} | :error
+  @doc """
+  A hook which is called while a concrete Component process is
+  created. It takes an Entity key and returns the initialized state.
+  """
+  @callback init_state(entity_key :: Lkn.Core.Entity.k) :: {:ok, state} | :error
 
+  @doc """
+  A macro to define a Component Specification to latter be implemented
+  for each compatible Entity.
+  """
   defmacro defcomponent(name, do: block) do
     state_type = quote do Lkn.Core.Component.state end
     key_type = quote do Lkn.Core.Entity.k end
