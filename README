@@ -1,0 +1,47 @@
+                        ━━━━━━━━━━━━━━━━━━━━━━
+                               LKN-CORE
+                        ━━━━━━━━━━━━━━━━━━━━━━
+
+Table of Contents
+─────────────────
+1. Overview
+2. Contributing
+
+
+
+1. Overview
+═══════════
+
+  lkn-core is a framework for creating game servers. It is written in
+  Elixir and implements a home-grown ECS supervisor tree and a
+  mechanism to dynamically spawn new instances for incoming players
+  whenever it is necessary.
+
+2. Contributing
+═══════════════
+
+  lkn-core is a Free Software distributed under the terms of the
+  AGPLv3+ License. The codebase is hosted at several locations,
+  including a Github repository[1] and a self-hosted
+  repository[2]. There also is a pijul repository[3], because I
+  believe using pijul for lkn is a good way to contribute to pijul
+  without having to write code.
+
+  If you want to submit a patch, feel free to do so in the manner you
+  find the more appropriate. For instance, you can:
+  · open a Github pull request if you have an account.
+  · send me a git remote I can fetch
+  · send me a patch using the Nest (pijul)
+  · send me an email with your patches
+
+  The most important thing is: by providing me a patch, you agree it
+  may become available to the lkn-core users under the terms of the
+  AGPLv3+ license. Moreover, consider lkn-core will soon be published
+  to Hex.mp and so will be your contributions if they find their way
+  to the master branch. Finally, regarding the fact that the codebase
+  is kept under two DVCS, know that I might create a patch of your
+  changes with the tool you didn't use.
+
+  [1] https://www.github.com/lkn-org/lkn-core
+  [2] http://git.lthms.xyz/lkn/lkn-core
+  [3] https://nest.pijul.com/lthms/lkn-core
