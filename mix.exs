@@ -6,7 +6,7 @@ defmodule Lkn.Mixfile do
       app:             :lkn_core,
       name:            "lkn-core",
       version:         "0.1.0",
-      elixir:          "~> 1.4",
+      elixir:          "~> 1.5",
       build_embedded:  Mix.env == :prod,
       start_permanent: Mix.env == :prod,
       source_url:      "https://nest.pijul.com/lthms/lkn-core",
@@ -44,15 +44,15 @@ defmodule Lkn.Mixfile do
     [
       # runtime
       {:uuid, "~> 1.1"},
-      {:lkn_prelude, "~> 0.1.1"},
-      {:beacon,      "~> 1.0"},
+      {:lkn_prelude, "~> 0.1.2"},
+      {:beacon,      "~> 1.1"},
 
       # development
-      {:credo,       "~> 0.4",  only: [:dev, :test], runtime: false},
+      {:credo,       "~> 0.8",  only: [:dev, :test], runtime: false},
       {:dialyxir,    "~> 0.5",  only: :dev,          runtime: false},
-      {:ex_doc,      "~> 0.15", only: :dev,          runtime: false},
-      {:excoveralls, "~> 0.6",  only: :test,         runtime: false},
-      {:distillery,  "~> 1.0",                       runtime: false},
+      {:ex_doc,      "~> 0.16", only: :dev,          runtime: false},
+      {:excoveralls, "~> 0.7",  only: :test,         runtime: false},
+      {:distillery,  "~> 1.4",                       runtime: false},
     ]
   end
 
