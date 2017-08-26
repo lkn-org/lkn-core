@@ -35,6 +35,14 @@ defmodule Lkn.Core.Instance.Supervisor do
 end
 
 defmodule Lkn.Core.Instance do
+  @moduledoc """
+  A Process to arbitrate the Systems of a given Map.
+
+  There are two things to remember about Instances:
+
+  1. There can be several Instances of a single Map
+  2. They are dynamically created by the `Lkn.Core.Pool` of a Map when required
+  """
   use Lkn.Prelude
 
   alias Lkn.Core.Entity
@@ -162,6 +170,7 @@ defmodule Lkn.Core.Instance do
     GenServer.start_link(__MODULE__, [map: map_key, instance: instance_key], name: Name.instance(instance_key))
   end
 
+  @doc false
   @spec spawn_instance(L.Map.k, k) :: Supervisor.on_start
   def spawn_instance(map_key, instance_key) do
     Supervisor.start_child(Name.instance_sup(map_key), [instance_key])
@@ -185,7 +194,7 @@ defmodule Lkn.Core.Instance do
       try do
         Lkn.Core.System.register_puppet(instance_key, sys, puppet_key)
       rescue
-        _ -> ()
+        _ -> nil
       end
     end)
 
@@ -200,7 +209,7 @@ defmodule Lkn.Core.Instance do
       try do
         Lkn.Core.System.unregister_puppet(instance_key, sys, puppet_key)
       rescue
-        _ -> ()
+        _ -> nil
       end
     end)
 
@@ -213,21 +222,14 @@ defmodule Lkn.Core.Instance do
     GenServer.call(Name.instance(instance_key), {:register_puppeteer, puppeteer_key, puppeteer_module})
   end
 
-  @doc """
-  After `lock/1` returns, the Instance refuses to register new puppeteers.
-  """
+  @doc false
   @spec lock(k) :: :ok
   def lock(instance_key) do
     GenServer.call(Name.instance(instance_key), :lock)
     :ok
   end
 
-  @doc """
-  After `kick_all/1` returns, the Instance is empty.
-
-  If `lock/1` has been called before, the Instance should quickly
-  exit.
-  """
+  @doc false
   @spec kick_all(k) :: :ok
   def kick_all(instance_key) do
     GenServer.cast(Name.instance(instance_key), :kick_all)
