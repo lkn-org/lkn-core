@@ -16,6 +16,27 @@ defmodule Lkn.Core.Specs do
         end))
   end
 
+  def gen_server_plugin_entry_point(block, key_type, key_to_name, state_type) do
+    block = case block do
+              {:__block__, _, x} -> x
+              x -> [x]
+            end
+
+    {casts, calls, legit} = parse_specs(block, [], [], [])
+
+    check_specs(casts, calls, legit, [allow_impl: true, allow_specs: false])
+
+    plugin = quote do :plugin end
+
+    casts_client = Enum.map(casts, &(cast_client(plugin, var_name("key"), key_type, key_to_name, &1)))
+    casts_behaviour = Enum.map(casts, &(cast_server(&1, var_name("key"), key_type, [], state_type, "_plugin")))
+
+    quote do
+      unquote(casts_client)
+      unquote(casts_behaviour)
+    end
+  end
+
   def gen_server_from_specs(block, key_type, key_to_name, state_type, keywords \\ []) do
     block = case block do
               {:__block__, _, x} -> x
@@ -30,8 +51,10 @@ defmodule Lkn.Core.Specs do
     key_name = Keyword.get(keywords, :key_name, var_name("key"))
     additional_args = Keyword.get(keywords, :additional_args, [])
 
-    casts_client = Enum.map(casts, &(cast_client(key_name, key_type, key_to_name, &1)))
-    calls_client = Enum.map(calls, &(call_client(key_name, key_type, key_to_name, &1)))
+    spec = quote do :spec end
+
+    casts_client = Enum.map(casts, &(cast_client(spec, key_name, key_type, key_to_name, &1)))
+    calls_client = Enum.map(calls, &(call_client(spec, key_name, key_type, key_to_name, &1)))
 
     casts_behaviour = Enum.map(casts, &(cast_server(&1, key_name, key_type, additional_args, state_type, impl_suffix)))
     calls_behaviour = Enum.map(calls, &(call_behaviour(&1, key_name, key_type, additional_args, state_type)))
@@ -45,7 +68,7 @@ defmodule Lkn.Core.Specs do
     end
   end
 
-  defp cast_client(key_name, key_type, key_to_name, cast) do
+  defp cast_client(namespace, key_name, key_type, key_to_name, cast) do
     cast = case cast do
              {cast, _} -> cast
              cast -> cast
@@ -68,12 +91,12 @@ defmodule Lkn.Core.Specs do
       @spec unquote({name, [], argtypes}) :: :ok
       def unquote({name, [], arglistcl}) do
         GenServer.cast(unquote(key_to_name).(unquote(key_name)),
-                       {:spec, {unquote(name), unquote(arglist)}})
+                       {unquote(namespace), {unquote(name), unquote(arglist)}})
       end
     end
   end
 
-  defp call_client(key_name, key_type, key_to_name, call) do
+  defp call_client(namespace, key_name, key_type, key_to_name, call) do
     name = call.fun.name
 
     call_doc = if call.doc != :none do
@@ -91,7 +114,7 @@ defmodule Lkn.Core.Specs do
       @spec unquote({name, [], argtypes}) :: unquote(call.ret)
       def unquote({name, [], arglistcl}) do
         GenServer.call(unquote(key_to_name).(unquote(key_name)),
-                       {:spec, {unquote(name), unquote(arglist)}})
+                       {unquote(namespace), {unquote(name), unquote(arglist)}})
       end
     end
   end
@@ -144,7 +167,6 @@ defmodule Lkn.Core.Specs do
       @callback unquote({name, [], arglistcl}) :: {unquote(state_type), unquote(call.ret)}
     end
   end
-
 
   defp parse_specs(block, casts, calls, legit) do
     case block do

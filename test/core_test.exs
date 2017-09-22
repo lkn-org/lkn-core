@@ -68,6 +68,24 @@ defmodule Lkn.Core.Test do
     Option.some(4) = Lkn.Core.Entity.read(entity_key, :level)
   end
 
+  test "spawning puppeteer and testing its private cast" do
+    puppeteer_key = UUID.uuid4()
+
+    {:ok, _} = Test.Puppeteer.start_link(puppeteer_key)
+
+    Test.Puppeteer.wizz(puppeteer_key, 2)
+
+    receive do
+      {:wizz, n, x} -> assert x == puppeteer_key && n == 0
+      after 100 -> raise "Waiting for 100ms the message {:wizz, 0, #{inspect puppeteer_key}}"
+    end
+
+    receive do
+      {:wizz, n, x} -> assert x == puppeteer_key && n == 1
+      after 100 -> raise "Waiting for 100ms the message {:wizz, 1, #{inspect puppeteer_key}}"
+    end
+  end
+
   test "spawning everything" do
     map_key = UUID.uuid4()
     puppeteer_key = UUID.uuid4()
@@ -415,7 +433,14 @@ defpuppeteer Test.Puppeteer.Specs do
 end
 
 defmodule Test.Puppeteer do
-  use Test.Puppeteer.Specs, state: pid()
+  use Test.Puppeteer.Specs do
+    cast wizz(n :: number) do
+      for i <- 0..(n-1) do
+        send state, {:wizz, i, key}
+      end
+      state
+    end
+  end
 
   def start_link(puppeteer_key) do
     Puppeteer.start_link(__MODULE__, puppeteer_key, self())

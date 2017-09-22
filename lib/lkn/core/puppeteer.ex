@@ -43,7 +43,18 @@ defmodule Lkn.Core.Puppeteer do
       defmodule unquote(name) do
         unquote(Specs.gen_server_from_specs(block, key_type, key_to_name, state_type))
 
-        defmacro __using__(_) do
+        defmacro __using__(args) do
+          plugin_clients = case args do
+                             [do: use_block] ->
+                               Specs.gen_server_plugin_entry_point(use_block,
+                                                                   quote do Lkn.Core.Puppeteer.k end,
+                                                                   &(Lkn.Core.Name.puppeteer(&1)),
+                                                                   quote do Lkn.Core.Puppeteer.state end)
+                             _ ->
+                               quote do
+                               end
+                           end
+
           quote do
             @behaviour unquote(__MODULE__)
             @behaviour Lkn.Core.Puppeteer
@@ -102,6 +113,12 @@ defmodule Lkn.Core.Puppeteer do
 
               {:noreply, %State{state|state: s}}
             end
+            def handle_cast({:plugin, {name, args}}, state) do
+              name = String.to_atom(String.replace_suffix(Atom.to_string(name), "", "_plugin"))
+              s = :erlang.apply(__MODULE__, name, [state.puppeteer_key|args]++[state.state])
+
+              {:noreply, %State{state|state: s}}
+            end
 
             def handle_call({:find_instance, map_key}, _from, state) do
               instance_key = Lkn.Core.Pool.register_puppeteer(map_key, state.puppeteer_key, __MODULE__)
@@ -115,6 +132,8 @@ defmodule Lkn.Core.Puppeteer do
 
               {:reply, res, %State{state|state: s}}
             end
+
+            unquote(plugin_clients)
           end
         end
       end
