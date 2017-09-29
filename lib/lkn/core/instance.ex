@@ -42,6 +42,14 @@ defmodule Lkn.Core.Instance do
 
   1. There can be several Instances of a single Map
   2. They are dynamically created by the `Lkn.Core.Pool` of a Map when required
+
+  In other words, it is not the developer job to spawn an Instance.  You can see
+  an instance as the entry point of a game scene. It acts as a proxy between
+  `Lkn.Core.Puppeteer`s and `Lkn.Core.System`s.
+
+  An Instance will stay alive as long as it hosts at least one
+  `Lkn.Core.Puppeteer`. Once it has became empty, it warns its `Lkn.Core.Pool`
+  so that the Pool can kill it.
   """
   use Lkn.Prelude
 
@@ -186,6 +194,17 @@ defmodule Lkn.Core.Instance do
     {:ok, State.new(map_key, instance_key)}
   end
 
+  @doc """
+  Insert a new Puppet into an Instance.
+
+  This function can be used by a `Lkn.Core.Puppeteer` to insert a new Puppet
+  into an Instance. There is no notion of Puppet owner, from an Instance point
+  of view. Therefore, any Puppeteer can send a command “on behalf of a given
+  Puppet. This Puppeteer will have the obligation to unregister it.
+
+  Under the hood, this function dispatches the register event to each system the
+  Puppet has a Component for.
+  """
   @spec register_puppet(k, Puppet.k) :: :ok
   def register_puppet(instance_key, puppet_key) do
     sys_map = Entity.systems(puppet_key)
@@ -201,6 +220,16 @@ defmodule Lkn.Core.Instance do
     :ok
   end
 
+  @doc """
+  Remove a Puppet from an Instance.
+
+  This function can be used by a `Lkn.Core.Puppeteer` to an Instance. An
+  Instance will never do it by itself, so it needs to be done by the Puppeteer
+  owner, e.g. before it registers istelf. Note that, if the Puppeteer forgets to
+  unregister one of its Puppets, this Puppets will stay in this Instance as long
+  as at least one Puppeteer stays registered (and it will probably do nothing at
+  all).
+  """
   @spec unregister_puppet(k, Puppet.k) :: :ok
   def unregister_puppet(instance_key, puppet_key) do
     sys_map = Entity.systems(puppet_key)
@@ -241,6 +270,14 @@ defmodule Lkn.Core.Instance do
     GenServer.call(Name.instance(instance_key), :killme)
   end
 
+  @doc """
+  Notify an Instance that a given Puppeteer is leaving.
+
+  This function needs to be used by a Puppeteer, __after__ it has removed all of
+  its Puppets. Right now, a Puppeteer cannot choose its Instance to join, and
+  the `Lkn.Core.Pool.register_puppeteer` is the function to use to join the
+  Instance of a given Map.
+  """
   @spec unregister_puppeteer(k, Puppeteer.k) :: :ok
   def unregister_puppeteer(instance_key, puppeteer_key) do
     GenServer.cast(Name.instance(instance_key), {:unregister_puppeteer, puppeteer_key})
