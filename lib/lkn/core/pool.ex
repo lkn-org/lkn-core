@@ -142,8 +142,13 @@ end
 defmodule Lkn.Core.Pool do
   use Supervisor
 
+  @moduledoc """
+  A specialized Supervisor which spawns new Map Instance when required.
+  """
+
   alias Lkn.Core.Name
 
+  @doc false
   def start_link(map_key) do
     Supervisor.start_link(__MODULE__, map_key)
   end
@@ -157,12 +162,19 @@ defmodule Lkn.Core.Pool do
     supervise(children, strategy: :one_for_all)
   end
 
+  @doc false
   @spec kill_request(L.Map.k, Instance.k) :: :ok
   def kill_request(map_key, instance_key) do
     GenServer.cast(Name.pool(map_key), {:kill_request, instance_key})
   end
 
-  @spec register_puppeteer(L.Map.k, Puppeteer.k, Puppeteer.m) :: Instance.k
+  @doc """
+  Register a given Puppeteer to an Instance of a given Map.
+
+  If required, the Pool will spawn a new Instance, so the Puppeteer do not have
+  to worry about that.  The Pool will return the Instance key.
+  """
+  @spec register_puppeteer(Lkn.Core.Map.k, Lkn.Core.Puppeteer.k, Lkn.Core.Puppeteer.m) :: Lkn.Core.Instance.k
   def register_puppeteer(map_key, puppeteer_key, puppeteer_module) do
     instance_key = GenServer.call(Name.pool(map_key), {:register, puppeteer_key, puppeteer_module})
 
@@ -171,7 +183,16 @@ defmodule Lkn.Core.Pool do
     instance_key
   end
 
-  @spec spawn_pool(L.Map.k) :: :ok
+  @doc """
+  Spwans a new Instances Pool for a given `Lkn.Core.Map`.
+
+  The Map is expected to be alive before this function is called. After that, it
+  is possible for a Puppeteer to join an Instance of this Map using
+  `register_puppeteer`.
+
+  __Note:__ The Pool lives inside a dedicated Supervisor tree.
+  """
+  @spec spawn_pool(Lkn.Core.Map.k) :: :ok
   def spawn_pool(map_key) do
     {:ok, _} = Supervisor.start_child(Lkn.Core.Pool.Supervisor, [map_key])
     :ok
