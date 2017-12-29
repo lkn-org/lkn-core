@@ -288,10 +288,16 @@ defmodule Lkn.Core.Instance do
 
       # we compute a digest of the map and each puppets
       map = Lkn.Core.Entity.digest(state.map_key)
-      puppets = Enum.map(state.puppets, &Lkn.Core.Entity.digest(&1))
+      puppets = Enum.reduce(state.puppets, Map.new(), &Map.put(&2, &1, Lkn.Core.Entity.digest(&1)))
 
       # we send these digest to our new friend the puppeteer
-      Lkn.Core.Puppeteer.instance_digest(puppeteer_key, state.instance_key, map, puppets)
+      Lkn.Core.Puppeteer.instance_digest(
+        puppeteer_key,
+        state.instance_key,
+        state.map_key,
+        map,
+        puppets
+      )
 
       {:reply, true, s2}
     else

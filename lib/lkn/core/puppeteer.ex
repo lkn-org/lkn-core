@@ -127,9 +127,9 @@ defmodule Lkn.Core.Puppeteer do
                 {:noreply, state}
               end
             end
-            def handle_cast({:instance_digest, instance_key, map, puppets}, state) do
+            def handle_cast({:instance_digest, instance_key, map_key, map, puppets}, state) do
               if state.instance_key == Lkn.Prelude.Option.some(instance_key) do
-                s2 = instance_digest(state.state, instance_key, map, puppets)
+                s2 = instance_digest(state.state, instance_key, map_key, map, puppets)
                 {:noreply, %State{state|state: s2}}
               else
                 {:noreply, state}
@@ -192,7 +192,13 @@ defmodule Lkn.Core.Puppeteer do
   @callback puppet_enter(s :: state, instance_key :: Lkn.Core.Instance.k, puppet_key :: Lkn.Core.Puppet.k, digest :: Lkn.Core.Entity.digest) :: state
   @callback puppet_leave(s :: state, instance_key :: Lkn.Core.Instance.k, puppet_key :: Lkn.Core.Puppet.k) :: state
   @callback destroy(puppeteer_key :: k, s :: state, instance_key :: Option.t(Lkn.Core.Instance.k), reason :: any) :: term
-  @callback instance_digest(s :: state, instance_key :: Lkn.Core.Instance, map :: Lkn.Core.Entity.digest, puppets :: Lkn.Core.Entity.digest) :: state
+  @callback instance_digest(
+    s :: state,
+    instance_key :: Lkn.Core.Instance,
+    map_key :: Lkn.Core.Map.k,
+    map :: Lkn.Core.Entity.digest,
+    puppets :: %{Lkn.Core.Puppet.k => Lkn.Core.Entity.digest}
+  ) :: state
 
   @spec leave_instance(k, Instance.k) :: :ok
   def leave_instance(puppeteer_key, instance_key) do
@@ -204,14 +210,17 @@ defmodule Lkn.Core.Puppeteer do
     GenServer.call(Name.puppeteer(puppeteer_key), {:find_instance, map_key})
   end
 
-  def instance_digest(puppeteer_key, instance_key, map, puppets) do
-    GenServer.cast(Name.puppeteer(puppeteer_key), {:instance_digest, instance_key, map, puppets})
+  @doc false
+  def instance_digest(puppeteer_key, instance_key, map_key, map, puppets) do
+    GenServer.cast(Name.puppeteer(puppeteer_key), {:instance_digest, instance_key, map_key, map, puppets})
   end
 
+  @doc false
   def puppet_enter(puppeteer_key, instance_key, puppet_key, digest) do
     GenServer.cast(Name.puppeteer(puppeteer_key), {:puppet_enter, instance_key, puppet_key, digest})
   end
 
+  @doc false
   def puppet_leave(puppeteer_key, instance_key, puppet_key) do
     GenServer.cast(Name.puppeteer(puppeteer_key), {:puppet_leave, instance_key, puppet_key})
   end

@@ -516,7 +516,7 @@ defmodule Test.Puppeteer do
     {:ok, s}
   end
 
-  def instance_digest(state, _instance_key, map, puppets) do
+  def instance_digest(state, _instance_key, map_key, _map, _puppets) do
     state
   end
 
