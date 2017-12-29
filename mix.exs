@@ -5,7 +5,7 @@ defmodule Lkn.Mixfile do
     [
       app:             :lkn_core,
       name:            "lkn-core",
-      version:         "0.1.0",
+      version:         "0.2.0",
       elixir:          "~> 1.5",
       build_embedded:  Mix.env == :prod,
       start_permanent: Mix.env == :prod,
@@ -62,7 +62,8 @@ defmodule Lkn.Mixfile do
 
   defp description do
     """
-    lkn core
+    Yet another ECS, actor-based and focused on getting ride of as much
+    boilerplate as possible.
     """
   end
 
