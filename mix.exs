@@ -68,6 +68,7 @@ defmodule Lkn.Mixfile do
         "lib",
         "mix.exs",
         "README.md",
+        "ChangeLog.md",
         "LICENSE",
       ],
       maintainers: [
