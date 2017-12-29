@@ -173,11 +173,7 @@ defmodule Lkn.Core.System do
 
     @spec notify(t, any) :: :ok
     def notify(state, notif) do
-      Registry.dispatch(Lkn.Core.Notifier, Name.notify_group(state.instance_key), fn entries ->
-        for {_, key} <- entries do
-          notif.(key)
-        end
-      end)
+      Lkn.Core.Instance.notify_puppeteers(state.instance_key, notif)
     end
   end
 

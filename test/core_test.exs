@@ -381,6 +381,10 @@ defmap Test.Map do
         %{:limit => 2}
     end
   end
+
+  def digest(_props) do
+    %{}
+  end
 end
 
 ######################################################################
@@ -410,6 +414,10 @@ defpuppet Test.Entity do
   def init_properties(name: name, level: level) do
     %{:name => name, :level => level}
   end
+
+  def digest(props) do
+    props
+  end
 end
 
 defpuppet Test.Ghost do
@@ -420,7 +428,11 @@ defpuppet Test.Ghost do
   end
 
   def init_properties([]) do
-    %{:name => "ghost", :level => 0}
+    %{}
+  end
+
+  def digest(props) do
+    props
   end
 end
 
@@ -450,12 +462,20 @@ defmodule Test.Puppeteer do
     {:ok, s}
   end
 
+  def puppet_enter(state, _instance_key, _puppet_key, _digest) do
+    state
+  end
+
+  def puppet_leave(state, _instance_key, _puppet_key) do
+    state
+  end
+
   def leave_instance(target, _instance_key) do
     send(target, :kick)
     target
   end
 
-  def emit(_puppeteer_key, msg, target) do
+  def emit(_puppeteer_key, msg, instance_key, target) do
     send target, msg
     target
   end

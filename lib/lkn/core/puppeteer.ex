@@ -41,15 +41,27 @@ defmodule Lkn.Core.Puppeteer do
 
     quote do
       defmodule unquote(name) do
-        unquote(Specs.gen_server_from_specs(block, key_type, key_to_name, state_type))
+        unquote(Specs.gen_server_from_specs(
+              block,
+              key_type,
+              key_to_name,
+              state_type,
+              additional_args: [
+                quote do unquote(Specs.var_name("instance_key")) :: Lkn.Core.Instance.k end,
+              ]
+            )
+        )
 
         defmacro __using__(args) do
           plugin_clients = case args do
                              [do: use_block] ->
-                               Specs.gen_server_plugin_entry_point(use_block,
-                                                                   quote do Lkn.Core.Puppeteer.k end,
-                                                                   &(Lkn.Core.Name.puppeteer(&1)),
-                                                                   quote do Lkn.Core.Puppeteer.state end)
+                               Specs.gen_server_plugin_entry_point(
+                                 use_block,
+                                 quote do Lkn.Core.Puppeteer.k end,
+                                 &(Lkn.Core.Name.puppeteer(&1)),
+                                 [quote do unquote(Specs.var_name("instance_key")) :: Lkn.Core.Instance.k end],
+                                 quote do Lkn.Core.Puppeteer.state end
+                               )
                              _ ->
                                quote do
                                end
@@ -97,6 +109,24 @@ defmodule Lkn.Core.Puppeteer do
               {:ok, State.new(puppeteer_key, s)}
             end
 
+            def handle_cast({:puppet_enter, instance_key, puppet_key, digest}, state) do
+              if state.instance_key == Lkn.Prelude.Option.some(instance_key) do
+                s2 = puppet_enter(state.state, state.instance_key, puppet_key, digest)
+
+                {:noreply, %State{state|state: s2}}
+              else
+                {:noreply, state}
+              end
+            end
+            def handle_cast({:puppet_leave, instance_key, puppet_key}, state) do
+              if state.instance_key == Lkn.Prelude.Option.some(instance_key) do
+                s2 = puppet_leave(state.state, state.instance_key, puppet_key)
+
+                {:noreply, %State{state|state: s2}}
+              else
+                {:noreply, state}
+              end
+            end
             def handle_cast({:leave_instance, instance_key}, state) do
               if state.instance_key == Lkn.Prelude.Option.some(instance_key) do
                 s2 = leave_instance(state.state, instance_key)
@@ -109,13 +139,13 @@ defmodule Lkn.Core.Puppeteer do
               end
             end
             def handle_cast({:spec, {name, args}}, state) do
-              s = :erlang.apply(__MODULE__, name, [state.puppeteer_key|args]++[state.state])
+              s = :erlang.apply(__MODULE__, name, [state.puppeteer_key|args]++[state.instance_key, state.state])
 
               {:noreply, %State{state|state: s}}
             end
             def handle_cast({:plugin, {name, args}}, state) do
               name = String.to_atom(String.replace_suffix(Atom.to_string(name), "", "_plugin"))
-              s = :erlang.apply(__MODULE__, name, [state.puppeteer_key|args]++[state.state])
+              s = :erlang.apply(__MODULE__, name, [state.puppeteer_key|args]++[state.instance_key, state.state])
 
               {:noreply, %State{state|state: s}}
             end
@@ -147,6 +177,8 @@ defmodule Lkn.Core.Puppeteer do
 
   @callback init_state(init_args) :: {:ok, state}|:error
   @callback leave_instance(state, Instance.k) :: state
+  @callback puppet_enter(state, Lkn.Core.Instance.k, Lkn.Core.Puppet.k, Lkn.Core.Entity.digest) :: state
+  @callback puppet_leave(state, Lkn.Core.Instance.k, Lkn.Core.Puppet.k) :: state
 
   @spec leave_instance(k, Instance.k) :: :ok
   def leave_instance(puppeteer_key, instance_key) do
@@ -156,5 +188,13 @@ defmodule Lkn.Core.Puppeteer do
   @spec find_instance(k, L.Map.k) :: Instance.k
   def find_instance(puppeteer_key, map_key) do
     GenServer.call(Name.puppeteer(puppeteer_key), {:find_instance, map_key})
+  end
+
+  def puppet_enter(puppeteer_key, instance_key, puppet_key, digest) do
+    GenServer.cast(Name.puppeteer(puppeteer_key), {:puppet_enter, instance_key, puppet_key, digest})
+  end
+
+  def puppet_leave(puppeteer_key, instance_key, puppet_key) do
+    GenServer.cast(Name.puppeteer(puppeteer_key), {:puppet_leave, instance_key, puppet_key})
   end
 end

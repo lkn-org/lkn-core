@@ -37,4 +37,9 @@ defmodule Lkn.Core.Properties do
   def write(entity_key, prop, v) do
     Agent.update(Lkn.Core.Name.properties(entity_key), &Map.put(&1, prop, v))
   end
+
+  @spec compute(Lkn.Core.Entity.k, (%{Lkn.Core.Entity.prop => Lkn.Core.Entity.value} -> any)) :: any
+  def compute(entity_key, function) do
+    Agent.get(Lkn.Core.Name.properties(entity_key), function)
+  end
 end

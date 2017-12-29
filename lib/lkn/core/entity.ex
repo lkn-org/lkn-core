@@ -72,6 +72,7 @@ defmodule Lkn.Core.Entity do
   `Lkn.Core.Puppet` or a `Lkn.Core.Map`.
   """
   @type k :: Lkn.Core.Map.k | Lkn.Core.Puppet.k
+  @type digest :: term
 
   @typedoc """
   The third argument of the `start_link/3` function which is passed to
@@ -86,6 +87,8 @@ defmodule Lkn.Core.Entity do
   """
   @callback init_properties(init_args) :: %{prop => value}
 
+  @callback digest(entity :: %{prop => value}) :: digest
+
   defmacro __using__(components: comps) do
     quote location: :keep do
       use Supervisor
@@ -94,6 +97,7 @@ defmodule Lkn.Core.Entity do
 
       def init(key: entity_key, args: args) do
         props = init_properties(args)
+        props = Map.put(props, :make_digest, & __MODULE__.digest(&1))
 
         sys = Enum.map(unquote(comps), &(&1.specs().system()))
 
@@ -106,6 +110,16 @@ defmodule Lkn.Core.Entity do
         supervise(children, strategy: :rest_for_one)
       end
     end
+  end
+
+  @doc """
+  Compute a digest which hopefully describes the entity
+  """
+  @spec digest(entity_key :: k) :: digest
+  def digest(entity_key) do
+    Option.some(di) = Lkn.Core.Entity.read(entity_key, :make_digest)
+
+    Lkn.Core.Properties.compute(entity_key, di)
   end
 
   @doc """

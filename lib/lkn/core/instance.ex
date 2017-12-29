@@ -207,6 +207,16 @@ defmodule Lkn.Core.Instance do
   """
   @spec register_puppet(k, Puppet.k) :: :ok
   def register_puppet(instance_key, puppet_key) do
+    # get a digest of the puppet and send it to the puppeteer
+    notify_puppeteers(instance_key, &Lkn.Core.Puppeteer.puppet_enter(
+          &1,
+          instance_key,
+          puppet_key,
+          Lkn.Core.Entity.digest(puppet_key)
+        )
+    )
+
+    # try registering the puppet to each system
     sys_map = Entity.systems(puppet_key)
 
     _ = Enum.map(sys_map, fn sys ->
@@ -232,6 +242,7 @@ defmodule Lkn.Core.Instance do
   """
   @spec unregister_puppet(k, Puppet.k) :: :ok
   def unregister_puppet(instance_key, puppet_key) do
+    # unregister the pupet from each systems
     sys_map = Entity.systems(puppet_key)
 
     _ = Enum.map(sys_map, fn sys ->
@@ -241,6 +252,14 @@ defmodule Lkn.Core.Instance do
         _ -> nil
       end
     end)
+
+    # notify the puppeteers
+    notify_puppeteers(instance_key, &Lkn.Core.Puppeteer.puppet_leave(
+          &1,
+          instance_key,
+          puppet_key
+        )
+    )
 
     :ok
   end
@@ -308,5 +327,13 @@ defmodule Lkn.Core.Instance do
   end
   def handle_cast({:unregister_puppeteer, puppeteer_key}, state) do
     {:noreply, State.unregister_puppeteer(state, puppeteer_key)}
+  end
+
+  def notify_puppeteers(instance_key, notif) do
+    Registry.dispatch(Lkn.Core.Notifier, Name.notify_group(instance_key), fn entries ->
+      for {_, key} <- entries do
+        notif.(key)
+      end
+    end)
   end
 end
