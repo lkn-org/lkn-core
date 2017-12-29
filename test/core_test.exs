@@ -133,6 +133,7 @@ defmodule Lkn.Core.Test do
     end
 
     Lkn.Core.Instance.unregister_puppet(instance_key, entity_key)
+    Process.sleep 10
     0 = Lkn.Core.System.population_size(instance_key, Test.System)
 
     receive do

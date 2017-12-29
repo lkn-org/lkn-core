@@ -75,6 +75,7 @@ defmodule Lkn.Core.Instance do
       :map_key,
       :instance_key,
       :puppeteers,
+      :puppets,
     ]
 
     @type mode :: :running|{:zombie, Option.t(Beacon.t)}
@@ -85,6 +86,7 @@ defmodule Lkn.Core.Instance do
       map_key: L.Map.k,
       instance_key: Instance.k,
       puppeteers: %{Puppeteer.k => Puppeteer.m},
+      puppets: MapSet.t,
     }
 
     @spec new(L.Map.k, Instance.k) :: t
@@ -95,7 +97,18 @@ defmodule Lkn.Core.Instance do
         map_key:      map_key,
         instance_key: instance_key,
         puppeteers:   Map.new(),
+        puppets:      MapSet.new(),
       }
+    end
+
+    @spec add_puppet(t, L.Puppet.k) :: t
+    def add_puppet(state, puppet) do
+      %State{state|puppets: MapSet.put(state.puppets, puppet)}
+    end
+
+    @spec delete_puppet(t, L.Puppet.k) :: t
+    def delete_puppet(state, puppet) do
+      %State{state|puppets: MapSet.delete(state.puppets, puppet)}
     end
 
     @spec lock(t) :: t
@@ -205,29 +218,9 @@ defmodule Lkn.Core.Instance do
   Under the hood, this function dispatches the register event to each system the
   Puppet has a Component for.
   """
-  @spec register_puppet(k, Puppet.k) :: :ok
+  @spec register_puppet(k, Puppet.k) :: boolean
   def register_puppet(instance_key, puppet_key) do
-    # get a digest of the puppet and send it to the puppeteer
-    notify_puppeteers(instance_key, &Lkn.Core.Puppeteer.puppet_enter(
-          &1,
-          instance_key,
-          puppet_key,
-          Lkn.Core.Entity.digest(puppet_key)
-        )
-    )
-
-    # try registering the puppet to each system
-    sys_map = Entity.systems(puppet_key)
-
-    _ = Enum.map(sys_map, fn sys ->
-      try do
-        Lkn.Core.System.register_puppet(instance_key, sys, puppet_key)
-      rescue
-        _ -> nil
-      end
-    end)
-
-    :ok
+    GenServer.call(Lkn.Core.Name.instance(instance_key), {:register_puppet, puppet_key})
   end
 
   @doc """
@@ -242,26 +235,7 @@ defmodule Lkn.Core.Instance do
   """
   @spec unregister_puppet(k, Puppet.k) :: :ok
   def unregister_puppet(instance_key, puppet_key) do
-    # unregister the pupet from each systems
-    sys_map = Entity.systems(puppet_key)
-
-    _ = Enum.map(sys_map, fn sys ->
-      try do
-        Lkn.Core.System.unregister_puppet(instance_key, sys, puppet_key)
-      rescue
-        _ -> nil
-      end
-    end)
-
-    # notify the puppeteers
-    notify_puppeteers(instance_key, &Lkn.Core.Puppeteer.puppet_leave(
-          &1,
-          instance_key,
-          puppet_key
-        )
-    )
-
-    :ok
+    GenServer.cast(Lkn.Core.Name.instance(instance_key), {:unregister_puppet, puppet_key})
   end
 
   @doc false
@@ -320,7 +294,65 @@ defmodule Lkn.Core.Instance do
       {:zombie, _} -> {:stop, :normal, true, state}
     end
   end
+  def handle_call({:register_puppet, puppet_key}, _from, state) do
+    # add the puppet to our list
+    if MapSet.member?(state.puppets, puppet_key) do
+      {:reply, false, state}
+    else
+      state = State.add_puppet(state, puppet_key)
 
+      # get a digest of the puppet and send it to the puppeteer
+      notify_puppeteers(state.instance_key, &Lkn.Core.Puppeteer.puppet_enter(
+            &1,
+            state.instance_key,
+            puppet_key,
+            Lkn.Core.Entity.digest(puppet_key)
+          )
+      )
+
+      # try registering the puppet to each system
+      sys_map = Entity.systems(puppet_key)
+
+      _ = Enum.map(sys_map, fn sys ->
+        try do
+          Lkn.Core.System.register_puppet(state.instance_key, sys, puppet_key)
+        rescue
+          _ -> nil
+        end
+      end)
+
+      {:reply, true, state}
+    end
+  end
+
+  def handle_cast({:unregister_puppet, puppet_key}, state) do
+    state = if MapSet.member?(state.puppets, puppet_key) do
+      # unregister the pupet from each systems
+      sys_map = Entity.systems(puppet_key)
+
+      _ = Enum.map(sys_map, fn sys ->
+        try do
+          Lkn.Core.System.unregister_puppet(state.instance_key, sys, puppet_key)
+        rescue
+          _ -> nil
+        end
+      end)
+
+      # notify the puppeteers
+      notify_puppeteers(state.instance_key, &Lkn.Core.Puppeteer.puppet_leave(
+            &1,
+            state.instance_key,
+            puppet_key
+          )
+      )
+
+      State.delete_puppet(state, puppet_key)
+    else
+      state
+    end
+
+    {:noreply, state}
+  end
   def handle_cast(:kick_all, state) do
     State.kick_all(state)
     {:noreply, state}
