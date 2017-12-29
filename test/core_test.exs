@@ -80,6 +80,19 @@ defmodule Lkn.Core.Test do
     Option.some(4) = Lkn.Core.Entity.read(entity_key, :level)
   end
 
+  test "spawning puppeteer just to stop it" do
+    puppeteer_key = UUID.uuid4()
+
+    {:ok, _} = Test.Puppeteer.start_link(puppeteer_key)
+
+    Lkn.Core.Puppeteer.stop(puppeteer_key)
+
+    receive do
+      {:destroyed, key} -> assert puppeteer_key == key
+      after 100 -> raise "should have received a destroy notification already"
+    end
+  end
+
   test "spawning puppeteer and testing its private cast" do
     puppeteer_key = UUID.uuid4()
 
@@ -495,6 +508,10 @@ defmodule Test.Puppeteer do
 
   def puppet_leave(state, _instance_key, _puppet_key) do
     state
+  end
+
+  def destroy(puppeteer_key, state, _instance_key, _reason) do
+    send state, {:destroyed, puppeteer_key}
   end
 
   def leave_instance(target, _instance_key) do

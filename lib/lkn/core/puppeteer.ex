@@ -164,6 +164,10 @@ defmodule Lkn.Core.Puppeteer do
             end
 
             unquote(plugin_clients)
+
+            def terminate(reason, state) do
+              destroy(state.puppeteer_key, state.state, state.instance_key, reason)
+            end
           end
         end
       end
@@ -176,9 +180,10 @@ defmodule Lkn.Core.Puppeteer do
   end
 
   @callback init_state(init_args) :: {:ok, state}|:error
-  @callback leave_instance(state, Instance.k) :: state
-  @callback puppet_enter(state, Lkn.Core.Instance.k, Lkn.Core.Puppet.k, Lkn.Core.Entity.digest) :: state
-  @callback puppet_leave(state, Lkn.Core.Instance.k, Lkn.Core.Puppet.k) :: state
+  @callback leave_instance(s :: state, instance_key :: Lkn.Core.Instance.k) :: state
+  @callback puppet_enter(s :: state, instance_key :: Lkn.Core.Instance.k, puppet_key :: Lkn.Core.Puppet.k, digest :: Lkn.Core.Entity.digest) :: state
+  @callback puppet_leave(s :: state, instance_key :: Lkn.Core.Instance.k, puppet_key :: Lkn.Core.Puppet.k) :: state
+  @callback destroy(puppeteer_key :: k, s :: state, instance_key :: Option.t(Lkn.Core.Instance.k), reason :: any) :: term
 
   @spec leave_instance(k, Instance.k) :: :ok
   def leave_instance(puppeteer_key, instance_key) do
@@ -196,5 +201,9 @@ defmodule Lkn.Core.Puppeteer do
 
   def puppet_leave(puppeteer_key, instance_key, puppet_key) do
     GenServer.cast(Name.puppeteer(puppeteer_key), {:puppet_leave, instance_key, puppet_key})
+  end
+
+  def stop(puppeteer_key, reason \\ :normal) do
+    GenServer.stop(Name.puppeteer(puppeteer_key), reason)
   end
 end
