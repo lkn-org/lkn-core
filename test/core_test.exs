@@ -114,13 +114,27 @@ defmodule Lkn.Core.Test do
   test "spawning everything" do
     map_key = UUID.uuid4()
     puppeteer_key = UUID.uuid4()
+    puppeteer_key2 = UUID.uuid4()
 
     {:ok, _} = Test.Puppeteer.start_link(puppeteer_key)
+    {:ok, _} = Test.Puppeteer.start_link(puppeteer_key2)
 
     {:ok, _} = Test.Map.start_link(map_key)
     :ok = Lkn.Core.Pool.spawn_pool(map_key)
 
     instance_key = Puppeteer.find_instance(puppeteer_key, map_key)
+    instance_key2 = Puppeteer.find_instance(puppeteer_key2, map_key)
+
+    assert instance_key == instance_key2
+
+    Lkn.Core.Puppeteer.leave_instance(puppeteer_key2, instance_key)
+
+    receive do
+      :kick -> :ok
+      after 100 -> assert false
+    end
+
+    Process.sleep 10
 
     entity_key = UUID.uuid4()
     ghost_key = UUID.uuid4()
@@ -141,7 +155,7 @@ defmodule Lkn.Core.Test do
     1 = Lkn.Core.System.population_size(instance_key, Test.System)
 
     receive do
-      _ -> assert false
+      x -> raise "we have received #{inspect x}, when we shouldn’t"
       after 100 -> :ok
     end
 
@@ -500,6 +514,10 @@ defmodule Test.Puppeteer do
 
   def init_state(s) do
     {:ok, s}
+  end
+
+  def instance_digest(state, _instance_key, map, puppets) do
+    state
   end
 
   def puppet_enter(state, _instance_key, _puppet_key, _digest) do

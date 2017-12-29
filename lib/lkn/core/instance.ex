@@ -283,7 +283,17 @@ defmodule Lkn.Core.Instance do
   end
   def handle_call({:register_puppeteer, puppeteer_key, puppeteer_module}, _from, state) do
     if !State.closed?(state) do
-      {:reply, true, State.register_puppeteer(state, puppeteer_key, puppeteer_module)}
+      # we remember this new puppeteer
+      s2 = State.register_puppeteer(state, puppeteer_key, puppeteer_module)
+
+      # we compute a digest of the map and each puppets
+      map = Lkn.Core.Entity.digest(state.map_key)
+      puppets = Enum.map(state.puppets, &Lkn.Core.Entity.digest(&1))
+
+      # we send these digest to our new friend the puppeteer
+      Lkn.Core.Puppeteer.instance_digest(puppeteer_key, state.instance_key, map, puppets)
+
+      {:reply, true, s2}
     else
       {:reply, false, state}
     end
