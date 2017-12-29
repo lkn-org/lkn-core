@@ -86,8 +86,8 @@ defmodule Lkn.Core.Entity do
   This map is used by
   """
   @callback init_properties(init_args) :: %{prop => value}
-
   @callback digest(entity :: %{prop => value}) :: digest
+  @callback destroy(key :: k, entity :: %{prop => value}, reason :: term) :: any
 
   defmacro __using__(components: comps) do
     quote location: :keep do
@@ -97,7 +97,7 @@ defmodule Lkn.Core.Entity do
 
       def init(key: entity_key, args: args) do
         props = init_properties(args)
-        props = Map.put(props, :make_digest, & __MODULE__.digest(&1))
+        props = Map.put(props, :module, __MODULE__)
 
         sys = Enum.map(unquote(comps), &(&1.specs().system()))
 
@@ -117,9 +117,9 @@ defmodule Lkn.Core.Entity do
   """
   @spec digest(entity_key :: k) :: digest
   def digest(entity_key) do
-    Option.some(di) = Lkn.Core.Entity.read(entity_key, :make_digest)
+    Option.some(mod) = Lkn.Core.Entity.read(entity_key, :module)
 
-    Lkn.Core.Properties.compute(entity_key, di)
+    Lkn.Core.Properties.compute(entity_key, &mod.digest(&1))
   end
 
   @doc """
@@ -151,5 +151,19 @@ defmodule Lkn.Core.Entity do
   @spec read(k, prop) :: Option.t(value)
   def read(key, prop) do
     Lkn.Core.Properties.read(key, prop)
+  end
+
+  @doc """
+  Stop the given Entity
+
+  This
+  """
+  def stop(key, reason \\ :normal) do
+    # clean up
+    Option.some(mod) = Lkn.Core.Entity.read(key, :module)
+    Lkn.Core.Properties.compute(key, &mod.destroy(key, &1, reason))
+
+    # and exit
+    Supervisor.stop(Name.entity(key), reason)
   end
 end

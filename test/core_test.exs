@@ -49,13 +49,25 @@ defmodule Lkn.Core.Test do
   test "spawning entity" do
     entity_key = UUID.uuid4()
 
-    {:ok, _} = Test.Entity.start_link(entity_key, name: "lkn", level: 4)
+    {:ok, _} = Test.Entity.start_link(entity_key, name: "lkn", level: 4, owner: self())
+  end
+
+  test "spawning then stoping entity" do
+    entity_key = UUID.uuid4()
+
+    {:ok, _} = Test.Entity.start_link(entity_key, name: "lkn", level: 4, owner: self())
+    Lkn.Core.Entity.stop(entity_key)
+
+    receive do
+      {:destroyed, key, :normal} -> assert key == entity_key
+      after 100 -> assert false
+    end
   end
 
   test "has component" do
     entity_key = UUID.uuid4()
 
-    {:ok, _} = Test.Entity.start_link(entity_key, name: "lkn", level: 4)
+    {:ok, _} = Test.Entity.start_link(entity_key, name: "lkn", level: 4, owner: self())
 
     assert Lkn.Core.Entity.has_component?(entity_key, Test.System)
     assert !Lkn.Core.Entity.has_component?(entity_key, Test.NoSystem)
@@ -64,7 +76,7 @@ defmodule Lkn.Core.Test do
   test "spawning entity and read level" do
     entity_key = UUID.uuid4()
 
-    {:ok, _} = Test.Entity.start_link(entity_key, name: "lkn", level: 4)
+    {:ok, _} = Test.Entity.start_link(entity_key, name: "lkn", level: 4, owner: self())
     Option.some(4) = Lkn.Core.Entity.read(entity_key, :level)
   end
 
@@ -100,7 +112,7 @@ defmodule Lkn.Core.Test do
     entity_key = UUID.uuid4()
     ghost_key = UUID.uuid4()
 
-    {:ok, _} = Test.Entity.start_link(entity_key, name: "lkn", level: 4)
+    {:ok, _} = Test.Entity.start_link(entity_key, name: "lkn", level: 4, owner: self())
     {:ok, _} = Test.Ghost.start_link(ghost_key)
 
     0 = Lkn.Core.System.population_size(instance_key, Test.System)
@@ -142,7 +154,7 @@ defmodule Lkn.Core.Test do
 
     entity_key = UUID.uuid4()
 
-    {:ok, _} = Test.Entity.start_link(entity_key, name: "lkn", level: 4)
+    {:ok, _} = Test.Entity.start_link(entity_key, name: "lkn", level: 4, owner: self())
 
     Lkn.Core.Instance.register_puppet(instance_key, entity_key)
 
@@ -385,6 +397,10 @@ defmap Test.Map do
   def digest(_props) do
     %{}
   end
+
+  def destroy(_key, _props, _reason) do
+    :ok
+  end
 end
 
 ######################################################################
@@ -407,16 +423,22 @@ end
 defpuppet Test.Entity do
   @components [Test.Entity.Component]
 
-  def start_link(key, args = [name: _name, level: _level]) do
+  def start_link(key, args = [name: _name, level: _level, owner: _owner]) do
     Lkn.Core.Entity.start_link(__MODULE__, key, args)
   end
 
-  def init_properties(name: name, level: level) do
-    %{:name => name, :level => level}
+  def init_properties(name: name, level: level, owner: owner) do
+    %{:name => name, :level => level, :owner => owner}
   end
 
   def digest(props) do
     props
+  end
+
+  def destroy(key, props, reason) do
+    target = Map.get(props, :owner)
+    send target, {:destroyed, key, reason}
+    :ok
   end
 end
 
@@ -433,6 +455,10 @@ defpuppet Test.Ghost do
 
   def digest(props) do
     props
+  end
+
+  def destroy(_key, _props, _reason) do
+    :ok
   end
 end
 
