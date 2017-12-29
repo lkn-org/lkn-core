@@ -22,6 +22,11 @@ defmodule Lkn.Mixfile do
         "coveralls.post":   :test,
         "coveralls.html":   :test,
       ],
+      docs: [
+        extras: [
+          "ChangeLog.md",
+        ],
+      ],
       dialyzer:        [
         flags: [
           :error_handling,
