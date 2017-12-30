@@ -119,7 +119,7 @@ defmodule Lkn.Core.Entity do
   def digest(entity_key) do
     Option.some(mod) = Lkn.Core.Entity.read(entity_key, :module)
 
-    Lkn.Core.Properties.compute(entity_key, &mod.digest(&1))
+    Lkn.Core.Properties.compute(entity_key, &mod.digest(Map.delete(&1, :module)))
   end
 
   @doc """
