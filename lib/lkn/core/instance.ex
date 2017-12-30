@@ -28,7 +28,7 @@ defmodule Lkn.Core.Instance.Supervisor do
 
   def init(map_key) do
     children = [
-      worker(Lkn.Core.Instance, [map_key])
+      worker(Lkn.Core.Instance, [map_key], restart: :transient)
     ]
     supervise(children, strategy: :simple_one_for_one)
   end

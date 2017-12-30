@@ -93,6 +93,44 @@ defmodule Lkn.Core.Test do
     end
   end
 
+  test "spawning and stopping puppeteers" do
+    # start puppeteers
+    puppeteer_key1 = UUID.uuid4()
+    puppeteer_key2 = UUID.uuid4()
+    puppeteer_key3 = UUID.uuid4()
+
+    {:ok, _} = Test.Puppeteer.start_link(puppeteer_key1)
+    {:ok, _} = Test.Puppeteer.start_link(puppeteer_key2)
+    {:ok, _} = Test.Puppeteer.start_link(puppeteer_key3)
+
+    # start map and pool
+    map_key = UUID.uuid4()
+    {:ok, _} = Test.Map.start_link(map_key)
+    :ok = Lkn.Core.Pool.spawn_pool(map_key)
+
+    instance_key1 = Lkn.Core.Puppeteer.find_instance(puppeteer_key1, map_key)
+    instance_key2 = Lkn.Core.Puppeteer.find_instance(puppeteer_key2, map_key)
+    instance_key3 = Lkn.Core.Puppeteer.find_instance(puppeteer_key3, map_key)
+
+    assert instance_key1 == instance_key2
+    assert instance_key1 != instance_key3
+
+    Lkn.Core.Puppeteer.leave_instance(puppeteer_key2, instance_key2)
+    instance_key2 = Lkn.Core.Puppeteer.find_instance(puppeteer_key2, map_key)
+
+    assert instance_key2 == instance_key3
+
+    Lkn.Core.Puppeteer.leave_instance(puppeteer_key2, instance_key2)
+    Lkn.Core.Puppeteer.leave_instance(puppeteer_key3, instance_key3)
+
+    # wait for the second instance to die
+    Process.sleep 150
+
+    instance_key2 = Lkn.Core.Puppeteer.find_instance(puppeteer_key2, map_key)
+
+    assert instance_key1 == instance_key2
+  end
+
   test "spawning puppeteer and testing its private cast" do
     puppeteer_key = UUID.uuid4()
 
