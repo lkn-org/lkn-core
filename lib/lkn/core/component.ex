@@ -149,6 +149,7 @@ defmodule Lkn.Core.Component do
             alias Lkn.Core.Name
             alias Lkn.Core.Properties
 
+            @doc false
             def specs do
               unquote(__MODULE__)
             end
