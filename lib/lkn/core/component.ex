@@ -128,6 +128,7 @@ defmodule Lkn.Core.Component do
         defmacro __using__(_) do
           quote do
             defmodule State do
+              @moduledoc false
               defstruct [
                 :entity_key,
                 :state,
