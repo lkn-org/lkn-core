@@ -263,27 +263,27 @@ defmodule Lkn.Core.System do
           State.notify(priv, notification)
           [priv: priv, pub: pub]
         end
-        defp priv_handle_cast({:register_puppet, entity_key}, priv: priv, pub: pub) do
-          {priv, pub} = if Lkn.Core.Entity.has_component?(entity_key, __MODULE__) do
-            {State.put(priv, entity_key), puppet_enter(pub, priv.instance_key, priv.map_key, priv.puppets, entity_key)}
+
+        defp priv_handle_call({:register_puppet, entity_key}, _from, priv: priv, pub: pub) do
+          {res, priv, pub} = if Lkn.Core.Entity.has_component?(entity_key, __MODULE__) do
+            {true, State.put(priv, entity_key), puppet_enter(pub, priv.instance_key, priv.map_key, priv.puppets, entity_key)}
           else
-            {priv, pub}
+            {false, priv, pub}
           end
 
-          [priv: priv, pub: pub]
+          {:reply, res, [priv: priv, pub: pub]}
         end
-        defp priv_handle_cast({:unregister_puppet, entity_key}, priv: priv, pub: pub) do
-          {priv, pub} =
+        defp priv_handle_call({:unregister_puppet, entity_key}, _from, priv: priv, pub: pub) do
+          {res, priv, pub} =
           if Lkn.Core.Entity.has_component?(entity_key, __MODULE__) do
             priv = State.delete(priv, entity_key)
-            {priv, puppet_leave(pub, priv.instance_key, priv.map_key, priv.puppets, entity_key)}
+            {true, priv, puppet_leave(pub, priv.instance_key, priv.map_key, priv.puppets, entity_key)}
           else
-            {priv, pub}
+            {false, priv, pub}
           end
 
-          [priv: priv, pub: pub]
+          {:reply, res, [priv: priv, pub: pub]}
         end
-
         defp priv_handle_call(:population_size, _from, priv: priv, pub: pub) do
           {:reply, State.population(priv), [priv: priv, pub: pub]}
         end
@@ -328,15 +328,15 @@ defmodule Lkn.Core.System do
   end
 
   @doc false
-  @spec register_puppet(Instance.k, m, Puppet.k) :: :ok
+  @spec register_puppet(Instance.k, m, Puppet.k) :: boolean
   def register_puppet(instance_key, system, puppet_key) do
-    GenServer.cast(Name.system(instance_key, system), {:priv, {:register_puppet, puppet_key}})
+    GenServer.call(Name.system(instance_key, system), {:priv, {:register_puppet, puppet_key}})
   end
 
   @doc false
-  @spec unregister_puppet(Instance.k, m, Puppet.k) :: :ok
+  @spec unregister_puppet(Instance.k, m, Puppet.k) :: boolean
   def unregister_puppet(instance_key, system, puppet_key) do
-    GenServer.cast(Name.system(instance_key, system), {:priv, {:unregister_puppet, puppet_key}})
+    GenServer.call(Name.system(instance_key, system), {:priv, {:unregister_puppet, puppet_key}})
   end
 
   @doc """

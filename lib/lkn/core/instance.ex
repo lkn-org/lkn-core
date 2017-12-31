@@ -233,9 +233,9 @@ defmodule Lkn.Core.Instance do
   as at least one Puppeteer stays registered (and it will probably do nothing at
   all).
   """
-  @spec unregister_puppet(k, Puppet.k) :: :ok
+  @spec unregister_puppet(k, Puppet.k) :: boolean
   def unregister_puppet(instance_key, puppet_key) do
-    GenServer.cast(Lkn.Core.Name.instance(instance_key), {:unregister_puppet, puppet_key})
+    GenServer.call(Lkn.Core.Name.instance(instance_key), {:unregister_puppet, puppet_key})
   end
 
   @doc false
@@ -340,8 +340,7 @@ defmodule Lkn.Core.Instance do
       {:reply, true, state}
     end
   end
-
-  def handle_cast({:unregister_puppet, puppet_key}, state) do
+  def handle_call({:unregister_puppet, puppet_key}, _from, state) do
     state = if MapSet.member?(state.puppets, puppet_key) do
       # unregister the pupet from each systems
       sys_map = Entity.systems(puppet_key)
@@ -367,7 +366,7 @@ defmodule Lkn.Core.Instance do
       state
     end
 
-    {:noreply, state}
+    {:reply, true, state}
   end
   def handle_cast(:kick_all, state) do
     State.kick_all(state)
