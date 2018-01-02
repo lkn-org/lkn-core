@@ -53,6 +53,7 @@ defmodule Lkn.Core.Puppeteer do
         )
 
         defmacro __using__(args) do
+
           plugin_clients = case args do
                              [do: use_block] ->
                                Specs.gen_server_plugin_entry_point(
@@ -76,7 +77,9 @@ defmodule Lkn.Core.Puppeteer do
             alias Lkn.Core.Instance
             alias Lkn.Core, as: L
 
-            defmodule State do
+            unquote(Specs.gen_server_returns())
+
+            defmodule PrivateState do
               @moduledoc false
 
               defstruct [
@@ -86,7 +89,7 @@ defmodule Lkn.Core.Puppeteer do
                 :state,
               ]
 
-              @type t :: %State{
+              @type t :: %PrivateState{
                 puppeteer_key: Puppeteer.k,
                 instance_key:  Lkn.Prelude.Option.t(Instance.k),
                 map_key:       Lkn.Prelude.Option.t(L.Map.k),
@@ -95,80 +98,92 @@ defmodule Lkn.Core.Puppeteer do
 
               @spec new(Puppeteer.t, Lkn.Core.Puppeteer.state) :: t
               def new(pk, s) do
-                %State{
+                %PrivateState{
                   puppeteer_key: pk,
                   instance_key:  Lkn.Prelude.Option.nothing(),
                   map_key:       Lkn.Prelude.Option.nothing(),
                   state:         s,
                 }
               end
+
+              def update(state, opts) do
+                st = Keyword.get(opts, :state, state.state)
+                instance = Keyword.get(opts, :instance, state.instance_key)
+                mapk = Keyword.get(opts, :map, state.map_key)
+
+                %PrivateState{state|
+                       state: st,
+                       map_key: mapk,
+                       instance_key: instance
+                }
+              end
             end
 
             def init({puppeteer_key, args}) do
               {:ok, s} = init_state(args)
-              {:ok, State.new(puppeteer_key, s)}
+              {:ok, PrivateState.new(puppeteer_key, s)}
             end
 
             def handle_cast({:puppet_enter, instance_key, puppet_key, digest}, state) do
               if state.instance_key == Lkn.Prelude.Option.some(instance_key) do
-                s2 = puppet_enter(state.state, state.instance_key, puppet_key, digest)
+                opts = puppet_enter(state.state, state.instance_key, puppet_key, digest)
 
-                {:noreply, %State{state|state: s2}}
+                {:noreply, PrivateState.update(state, opts)}
               else
                 {:noreply, state}
               end
             end
             def handle_cast({:puppet_leave, instance_key, puppet_key}, state) do
               if state.instance_key == Lkn.Prelude.Option.some(instance_key) do
-                s2 = puppet_leave(state.state, state.instance_key, puppet_key)
+                opts = puppet_leave(state.state, state.instance_key, puppet_key)
 
-                {:noreply, %State{state|state: s2}}
+                {:noreply, PrivateState.update(state, opts)}
               else
                 {:noreply, state}
               end
             end
             def handle_cast({:instance_digest, instance_key, map_key, map, puppets}, state) do
               if state.instance_key == Lkn.Prelude.Option.some(instance_key) do
-                s2 = instance_digest(state.state, instance_key, map_key, map, puppets)
-                {:noreply, %State{state|state: s2}}
+                opts = instance_digest(state.state, instance_key, map_key, map, puppets)
+                {:noreply, PrivateState.update(state, opts)}
               else
                 {:noreply, state}
               end
             end
             def handle_cast({:leave_instance, instance_key}, state) do
               if state.instance_key == Lkn.Prelude.Option.some(instance_key) do
-                s2 = leave_instance(state.state, instance_key)
+                opts = leave_instance(state.state, instance_key)
 
                 Instance.unregister_puppeteer(instance_key, state.puppeteer_key)
 
-                {:noreply, %State{state|instance_key: Lkn.Prelude.Option.nothing(), state: s2}}
+                {:noreply, PrivateState.update(state, opts)}
               else
                 {:noreply, state}
               end
             end
             def handle_cast({:spec, {name, args}}, state) do
-              s = :erlang.apply(__MODULE__, name, [state.puppeteer_key|args]++[state.instance_key, state.state])
+              opts = :erlang.apply(__MODULE__, name, [state.puppeteer_key|args]++[state.instance_key, state.state])
 
-              {:noreply, %State{state|state: s}}
+              {:noreply, PrivateState.update(state, opts)}
             end
             def handle_cast({:plugin, {name, args}}, state) do
               name = String.to_atom(String.replace_suffix(Atom.to_string(name), "", "_plugin"))
-              s = :erlang.apply(__MODULE__, name, [state.puppeteer_key|args]++[state.instance_key, state.state])
+              opts = :erlang.apply(__MODULE__, name, [state.puppeteer_key|args]++[state.instance_key, state.state])
 
-              {:noreply, %State{state|state: s}}
+              {:noreply, PrivateState.update(state, opts)}
             end
 
             def handle_call({:find_instance, map_key}, _from, state) do
               instance_key = Lkn.Core.Pool.register_puppeteer(map_key, state.puppeteer_key, __MODULE__)
 
-              state = %State{state|instance_key: Lkn.Prelude.Option.some(instance_key)}
+              state = %PrivateState{state|instance_key: Lkn.Prelude.Option.some(instance_key)}
 
               {:reply, instance_key, state}
             end
             def handle_call({:spec, {name, args}}, _call, state) do
-              {res, s} = :erlang.apply(__MODULE__, name, [state.puppeteer_key|args] ++ [state.state])
+              {res, opts} = :erlang.apply(__MODULE__, name, [state.puppeteer_key|args] ++ [state.state])
 
-              {:reply, res, %State{state|state: s}}
+              {:reply, res, PrivateState.update(state, opts)}
             end
 
             unquote(plugin_clients)

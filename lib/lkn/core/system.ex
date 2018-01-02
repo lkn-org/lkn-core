@@ -126,27 +126,38 @@ defmodule Lkn.Core.System do
   @typedoc "A set of “compatible” puppets."
   @type puppets :: MapSet.t(Puppet.t)
 
-  defmodule State do
+  defmodule PrivateState do
     @moduledoc false
 
     defstruct [
       :map_key,
       :instance_key,
       :puppets,
+      :state,
     ]
 
-    @type t :: %State{
+    @type t :: %PrivateState{
       map_key: Map.k,
       instance_key: Instance.k,
       puppets: System.puppets,
+      state: term,
     }
 
-    @spec new(Instance.k, Map.k) :: t
-    def new(instance_key, map_key) do
-      %State{
+    @spec new(Instance.k, Map.k, term) :: t
+    def new(instance_key, map_key, public) do
+      %PrivateState{
         puppets: MapSet.new(),
         instance_key: instance_key,
         map_key: map_key,
+        state: public,
+      }
+    end
+
+    def update(state, opts) do
+      st = Keyword.get(opts, :state, state.state)
+
+      %PrivateState{state|
+                    state: st
       }
     end
 
@@ -154,14 +165,14 @@ defmodule Lkn.Core.System do
     def put(state, puppet_key) do
       puppets = MapSet.put(state.puppets, puppet_key)
 
-      %State{state|
+      %PrivateState{state|
              puppets: puppets
       }
     end
 
     @spec delete(t, Puppet.k) :: t
     def delete(state, puppet_key) do
-      %State{state|
+      %PrivateState{state|
              puppets: MapSet.delete(state.puppets, puppet_key)
       }
     end
@@ -199,7 +210,7 @@ defmodule Lkn.Core.System do
     instance_key :: Instance.k,
     map_key :: Map.k,
     puppets :: System.puppets,
-    puppet_key :: Puppet.k) :: state
+    puppet_key :: Puppet.k) :: term
 
   @doc """
   A hook function which is called when a “compatible” puppet leaves the Instance.
@@ -209,7 +220,7 @@ defmodule Lkn.Core.System do
     instance_key :: Instance.k,
     map_key :: Map.k,
     puppets :: System.puppets,
-    puppet_key :: Puppet.k) :: state
+    puppet_key :: Puppet.k) :: term
 
   @doc """
   A macro to ease the definition of a new System which provides the
@@ -230,6 +241,8 @@ defmodule Lkn.Core.System do
         use GenServer
 
         @behaviour Lkn.Core.System
+
+        unquote(Specs.gen_server_returns())
 
         unquote(Specs.gen_server_from_specs(
               block,
@@ -259,53 +272,54 @@ defmodule Lkn.Core.System do
           {:ok, st}
         end
 
-        defp priv_handle_cast({:notify, notification}, priv: priv, pub: pub) do
-          State.notify(priv, notification)
-          [priv: priv, pub: pub]
+        defp priv_handle_cast({:notify, notification}, state) do
+          PrivateState.notify(state, notification)
+
+          {:noreply, state}
         end
 
-        defp priv_handle_call({:register_puppet, entity_key}, _from, priv: priv, pub: pub) do
-          {res, priv, pub} = if Lkn.Core.Entity.has_component?(entity_key, __MODULE__) do
-            {true, State.put(priv, entity_key), puppet_enter(pub, priv.instance_key, priv.map_key, priv.puppets, entity_key)}
-          else
-            {false, priv, pub}
-          end
-
-          {:reply, res, [priv: priv, pub: pub]}
-        end
-        defp priv_handle_call({:unregister_puppet, entity_key}, _from, priv: priv, pub: pub) do
-          {res, priv, pub} =
+        defp priv_handle_call({:register_puppet, entity_key}, _from, state) do
           if Lkn.Core.Entity.has_component?(entity_key, __MODULE__) do
-            priv = State.delete(priv, entity_key)
-            {true, priv, puppet_leave(pub, priv.instance_key, priv.map_key, priv.puppets, entity_key)}
-          else
-            {false, priv, pub}
-          end
+            state = PrivateState.put(state, entity_key)
+            opts =  puppet_enter(state.state, state.instance_key, state.map_key, state.puppets, entity_key)
 
-          {:reply, res, [priv: priv, pub: pub]}
+            {:reply, true, PrivateState.update(state, opts)}
+          else
+            {:reply, false, state}
+          end
         end
-        defp priv_handle_call(:population_size, _from, priv: priv, pub: pub) do
-          {:reply, State.population(priv), [priv: priv, pub: pub]}
+        defp priv_handle_call({:unregister_puppet, entity_key}, _from, state) do
+          if Lkn.Core.Entity.has_component?(entity_key, __MODULE__) do
+            opts = puppet_leave(state.state, state.instance_key, state.map_key, state.puppets, entity_key)
+            state = PrivateState.delete(state, entity_key)
+
+            {:reply, true, PrivateState.update(state, opts)}
+          else
+            {:reply, false, state}
+          end
+        end
+        defp priv_handle_call(:population_size, _from, state) do
+          {:reply, PrivateState.population(state), state}
         end
 
         def handle_cast({:priv, cmd}, state) do
-          {:noreply, priv_handle_cast(cmd, state)}
+          priv_handle_cast(cmd, state)
         end
-        def handle_cast({:spec, {name, args}}, priv: priv, pub: pub) do
+        def handle_cast({:spec, {name, args}}, state) do
           name = String.to_atom(String.replace_suffix(Atom.to_string(name), "", "_impl"))
-          s = :erlang.apply(__MODULE__, name, [priv.instance_key|args] ++ [priv.map_key, priv.puppets, pub])
+          opts = :erlang.apply(__MODULE__, name, [state.instance_key|args] ++ [state.map_key, state.puppets, state.state])
 
-          {:noreply, [priv: priv, pub: s]}
+          {:noreply, PrivateState.update(state, opts)}
         end
 
-        def handle_call({:spec, {name, args}}, _call, priv: priv, pub: pub) do
+        def handle_call({:spec, {name, args}}, _call, state) do
           name = String.to_atom(String.replace_suffix(Atom.to_string(name), "", "_impl"))
-          {res, s} = :erlang.apply(__MODULE__, name, [priv.instance_key|args] ++ [priv.map_key, priv.puppets, pub])
+          {res, opts} = :erlang.apply(__MODULE__, name, [state.instance_key|args] ++ [state.map_key, state.puppets, state.state])
 
-          {:reply, res, [priv: priv, pub: s]}
+          {:reply, res, PrivateState.update(state, opts)}
         end
-        def handle_call({:priv, cmd}, from, priv: priv, pub: pub) do
-          priv_handle_call(cmd, from, priv: priv, pub: pub)
+        def handle_call({:priv, cmd}, from, state) do
+          priv_handle_call(cmd, from, state)
         end
 
         @spec notify(any) :: :ok
@@ -319,12 +333,13 @@ defmodule Lkn.Core.System do
   @doc false
   @spec start_link(m, Instance.k, Map.k) :: GenServer.on_start
   def start_link(module, instance_key, map_key) do
-    GenServer.start_link(module,
-      [
-        priv: State.new(instance_key, map_key),
-        pub: module.init_state(instance_key, map_key),
-      ],
-      name: Name.system(instance_key, module))
+    pub = module.init_state(instance_key, map_key)
+
+    GenServer.start_link(
+      module,
+      PrivateState.new(instance_key, map_key, pub),
+      name: Name.system(instance_key, module)
+    )
   end
 
   @doc false

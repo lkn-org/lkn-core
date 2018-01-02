@@ -54,6 +54,18 @@ defmodule Lkn.Core.Specs do
     end
   end
 
+  def gen_server_returns() do
+    quote do
+      defp cast_return(opts \\ []) do
+        opts
+      end
+
+      defp call_return(res, opts \\ []) do
+        {res, opts}
+      end
+    end
+  end
+
   def gen_server_from_specs(block, key_type, key_to_name, state_type, keywords \\ []) do
     block = case block do
               {:__block__, _, x} -> x

@@ -417,19 +417,21 @@ defsystem Test.System do
 
   def puppet_enter(:ok, _instance_key, _map_key, _entities, key) do
     notify(&(Test.Puppeteer.Specs.emit(&1, {:enter, key})))
-    :ok
+
+    cast_return()
   end
 
   def puppet_leave(:ok, _instance_key, _map_key, _entities, key) do
     notify(&(Test.Puppeteer.Specs.emit(&1, {:leave, key})))
-    :ok
+
+    cast_return()
   end
 
   cast level_up(puppet_key :: Puppet.k) do
     notif = Test.System.Puppet.level_up(puppet_key)
     notify(&(Test.Puppeteer.Specs.emit(&1, {:level_up, notif})))
 
-    state
+    cast_return()
   end
 end
 
@@ -542,7 +544,8 @@ defmodule Test.Puppeteer do
       for i <- 0..(n-1) do
         send state, {:wizz, i, key}
       end
-      state
+
+      cast_return()
     end
   end
 
@@ -555,15 +558,15 @@ defmodule Test.Puppeteer do
   end
 
   def instance_digest(state, _instance_key, map_key, _map, _puppets) do
-    state
+    cast_return()
   end
 
   def puppet_enter(state, _instance_key, _puppet_key, _digest) do
-    state
+    cast_return()
   end
 
   def puppet_leave(state, _instance_key, _puppet_key) do
-    state
+    cast_return()
   end
 
   def destroy(puppeteer_key, state, _instance_key, _reason) do
@@ -572,12 +575,12 @@ defmodule Test.Puppeteer do
 
   def leave_instance(target, _instance_key) do
     send(target, :kick)
-    target
+    cast_return()
   end
 
   def emit(_puppeteer_key, msg, instance_key, target) do
     send target, msg
-    target
+    cast_return()
   end
 end
 
