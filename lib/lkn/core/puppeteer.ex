@@ -46,6 +46,7 @@ defmodule Lkn.Core.Puppeteer do
               key_type,
               key_to_name,
               state_type,
+              key_name: Specs.var_name("puppeteer_key"),
               additional_args: [
                 quote do unquote(Specs.var_name("instance_key")) :: Lkn.Core.Instance.k end,
               ]
@@ -58,6 +59,7 @@ defmodule Lkn.Core.Puppeteer do
                              [do: use_block] ->
                                Specs.gen_server_plugin_entry_point(
                                  use_block,
+                                 "puppeteer_key",
                                  quote do Lkn.Core.Puppeteer.k end,
                                  &(Lkn.Core.Name.puppeteer(&1)),
                                  [quote do unquote(Specs.var_name("instance_key")) :: Lkn.Core.Instance.k end],

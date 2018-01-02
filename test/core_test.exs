@@ -542,7 +542,7 @@ defmodule Test.Puppeteer do
   use Test.Puppeteer.Specs do
     cast wizz(n :: number) do
       for i <- 0..(n-1) do
-        send state, {:wizz, i, key}
+        send state, {:wizz, i, puppeteer_key}
       end
 
       cast_return()

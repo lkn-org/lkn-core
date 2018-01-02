@@ -33,7 +33,7 @@ defmodule Lkn.Core.Specs do
         end))
   end
 
-  def gen_server_plugin_entry_point(block, key_type, key_to_name, additional_args, state_type) do
+  def gen_server_plugin_entry_point(block, key_name, key_type, key_to_name, additional_args, state_type) do
     block = case block do
               {:__block__, _, x} -> x
               x -> [x]
@@ -45,8 +45,8 @@ defmodule Lkn.Core.Specs do
 
     plugin = quote do :plugin end
 
-    casts_client = Enum.map(casts, &(cast_client(plugin, var_name("key"), key_type, key_to_name, &1)))
-    casts_behaviour = Enum.map(casts, &(cast_server(&1, var_name("key"), key_type, additional_args, state_type, "_plugin")))
+    casts_client = Enum.map(casts, &(cast_client(plugin, var_name(key_name), key_type, key_to_name, &1)))
+    casts_behaviour = Enum.map(casts, &(cast_server(&1, var_name(key_name), key_type, additional_args, state_type, "_plugin")))
 
     quote do
       unquote(casts_client)
