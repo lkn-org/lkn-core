@@ -200,7 +200,7 @@ defmodule Lkn.Core.System do
   instance. With the `map_key`, you can request through the Map
   Component some information about the map.
   """
-  @callback init_state(instance_key :: Instance.k, map_key :: Map.k, opts :: Keyword.t) :: state
+  @callback init_state(instance_key :: Instance.k, map_key :: Map.k) :: state
 
   @doc """
   A hook function which is called when a “compatible” puppet enters the Instance.
@@ -210,7 +210,9 @@ defmodule Lkn.Core.System do
     instance_key :: Instance.k,
     map_key :: Map.k,
     puppets :: System.puppets,
-    puppet_key :: Puppet.k) :: term
+    puppet_key :: Puppet.k,
+    opts :: Keyword.t
+  ) :: term
 
   @doc """
   A hook function which is called when a “compatible” puppet leaves the Instance.
