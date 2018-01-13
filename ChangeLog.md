@@ -1,5 +1,12 @@
 # ChangeLog
 
+## lkn_core 0.4.0
+
+* **[Breaking Change]** It is no possible to send per-system options when
+  registering a puppet
+* **[Breaking Change]** Rename the `key` argument of the cast/call of a
+  Puppeteer into the more straightforward `puppeteer_key`
+
 ## lkn_core 0.3.0
 
 * When an instance was killed (once empty), its pool was crashing.
