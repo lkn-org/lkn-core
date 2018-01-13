@@ -207,6 +207,38 @@ defmodule Lkn.Core.Test do
     end
   end
 
+  test "register_puppet and option for system" do
+    map_key = UUID.uuid4()
+    puppeteer_key = UUID.uuid4()
+
+    {:ok, _} = Test.Puppeteer.start_link(puppeteer_key)
+
+    {:ok, _} = Test.Map.start_link(map_key)
+    :ok = Lkn.Core.Pool.spawn_pool(map_key)
+
+    instance_key = Puppeteer.find_instance(puppeteer_key, map_key)
+
+    entity_key = UUID.uuid4()
+
+    {:ok, _} = Test.Entity.start_link(entity_key, name: "lkn", level: 4, owner: self())
+
+    Lkn.Core.Instance.register_puppet(
+      instance_key,
+      entity_key,
+      Map.put(Map.new, Test.System, [ping: self()])
+    )
+
+    receive do
+      :pong -> :ok
+      after 100 -> assert false
+    end
+
+    receive do
+      {:enter, x} -> assert x == entity_key
+      after 100 -> raise "Waiting for 100ms the message {:enter, #{inspect entity_key}}"
+    end
+  end
+
   test "level up" do
     map_key = UUID.uuid4()
     puppeteer_key = UUID.uuid4()
@@ -415,7 +447,12 @@ defsystem Test.System do
     Lkn.Core.System.start_link(__MODULE__, instance_key, map_key)
   end
 
-  def puppet_enter(:ok, _instance_key, _map_key, _entities, key) do
+  def puppet_enter(:ok, _instance_key, _map_key, _entities, key, opts) do
+    if Keyword.has_key?(opts, :ping) do
+      target = Keyword.fetch!(opts, :ping)
+      send target, :pong
+    end
+
     notify(&(Test.Puppeteer.Specs.emit(&1, {:enter, key})))
 
     cast_return()

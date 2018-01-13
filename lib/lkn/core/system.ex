@@ -38,7 +38,7 @@ defmodule Lkn.Core.System do
           # return some state
         end
 
-        def puppet_enter(state, _instance_key, _map_key, _puppets, _puppet_key)
+        def puppet_enter(state, _instance_key, _map_key, _puppets, _puppet_key, opts)
           # we do nothing, but we could
           state
         end
@@ -200,7 +200,7 @@ defmodule Lkn.Core.System do
   instance. With the `map_key`, you can request through the Map
   Component some information about the map.
   """
-  @callback init_state(instance_key :: Instance.k, map_key :: Map.k) :: state
+  @callback init_state(instance_key :: Instance.k, map_key :: Map.k, opts :: Keyword.t) :: state
 
   @doc """
   A hook function which is called when a “compatible” puppet enters the Instance.
@@ -278,10 +278,10 @@ defmodule Lkn.Core.System do
           {:noreply, state}
         end
 
-        defp priv_handle_call({:register_puppet, entity_key}, _from, state) do
+        defp priv_handle_call({:register_puppet, entity_key, opts}, _from, state) do
           if Lkn.Core.Entity.has_component?(entity_key, __MODULE__) do
             state = PrivateState.put(state, entity_key)
-            opts =  puppet_enter(state.state, state.instance_key, state.map_key, state.puppets, entity_key)
+            opts =  puppet_enter(state.state, state.instance_key, state.map_key, state.puppets, entity_key, opts)
 
             {:reply, true, PrivateState.update(state, opts)}
           else
@@ -343,9 +343,9 @@ defmodule Lkn.Core.System do
   end
 
   @doc false
-  @spec register_puppet(Instance.k, m, Puppet.k) :: boolean
-  def register_puppet(instance_key, system, puppet_key) do
-    GenServer.call(Name.system(instance_key, system), {:priv, {:register_puppet, puppet_key}})
+  @spec register_puppet(Instance.k, m, Puppet.k, Keyword.t) :: boolean
+  def register_puppet(instance_key, system, puppet_key, opts) do
+    GenServer.call(Name.system(instance_key, system), {:priv, {:register_puppet, puppet_key, opts}})
   end
 
   @doc false

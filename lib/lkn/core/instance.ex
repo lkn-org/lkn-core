@@ -218,9 +218,9 @@ defmodule Lkn.Core.Instance do
   Under the hood, this function dispatches the register event to each system the
   Puppet has a Component for.
   """
-  @spec register_puppet(k, Puppet.k) :: boolean
-  def register_puppet(instance_key, puppet_key) do
-    GenServer.call(Lkn.Core.Name.instance(instance_key), {:register_puppet, puppet_key})
+  @spec register_puppet(k, Puppet.k, %{Lkn.Core.System.m => Keyworld.t}) :: boolean
+  def register_puppet(instance_key, puppet_key, opts \\ %{}) do
+    GenServer.call(Lkn.Core.Name.instance(instance_key), {:register_puppet, puppet_key, opts})
   end
 
   @doc """
@@ -310,7 +310,7 @@ defmodule Lkn.Core.Instance do
       {:zombie, _} -> {:stop, :normal, true, state}
     end
   end
-  def handle_call({:register_puppet, puppet_key}, _from, state) do
+  def handle_call({:register_puppet, puppet_key, sys_opts}, _from, state) do
     # add the puppet to our list
     if MapSet.member?(state.puppets, puppet_key) do
       {:reply, false, state}
@@ -331,7 +331,12 @@ defmodule Lkn.Core.Instance do
 
       _ = Enum.map(sys_map, fn sys ->
         try do
-          Lkn.Core.System.register_puppet(state.instance_key, sys, puppet_key)
+          Lkn.Core.System.register_puppet(
+            state.instance_key,
+            sys,
+            puppet_key,
+            Map.get(sys_opts, sys, [])
+          )
         rescue
           _ -> nil
         end
