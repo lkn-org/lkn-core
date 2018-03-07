@@ -54,7 +54,7 @@ defmodule Lkn.Core do
 
     @spec notify_group(Instance.k) :: t
     def notify_group(instance_key) do
-      {:via, Registry, {Lkn.Core.Notifier, {:engine, instance_key, :notifier}}}
+      {:engine, instance_key, :notifier}
     end
 
     @spec instance(Instance.k) :: t
