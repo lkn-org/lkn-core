@@ -274,8 +274,6 @@ defmodule Lkn.Core.Instance do
   @spec unregister_puppeteer(k, Puppeteer.k) :: :ok
   def unregister_puppeteer(instance_key, puppeteer_key) do
     GenServer.cast(Name.instance(instance_key), {:unregister_puppeteer, puppeteer_key})
-
-    Registry.unregister(Lkn.Core.Notifier, Name.notify_group(instance_key))
   end
 
   def handle_call(:lock, _from, state) do
@@ -284,7 +282,7 @@ defmodule Lkn.Core.Instance do
   def handle_call({:register_puppeteer, puppeteer_key, puppeteer_module}, _from, state) do
     if !State.closed?(state) do
       # we remember this new puppeteer
-      s2 = State.register_puppeteer(state, puppeteer_key, puppeteer_module)
+      state = State.register_puppeteer(state, puppeteer_key, puppeteer_module)
 
       # we compute a digest of the map and each puppets
       map = Lkn.Core.Entity.digest(state.map_key)
@@ -299,7 +297,7 @@ defmodule Lkn.Core.Instance do
         puppets
       )
 
-      {:reply, true, s2}
+      {:reply, true, state}
     else
       {:reply, false, state}
     end
@@ -380,12 +378,15 @@ defmodule Lkn.Core.Instance do
   def handle_cast({:unregister_puppeteer, puppeteer_key}, state) do
     {:noreply, State.unregister_puppeteer(state, puppeteer_key)}
   end
+  def handle_cast({:notify_group, notif}, state) do
+    Enum.map(state.puppeteers, fn {key, _} ->
+      notif.(key)
+    end)
+
+    {:noreply, state}
+  end
 
   def notify_puppeteers(instance_key, notif) do
-    Registry.dispatch(Lkn.Core.Notifier, Name.notify_group(instance_key), fn entries ->
-      for {_, key} <- entries do
-        notif.(key)
-      end
-    end)
+    GenServer.cast(Name.instance(instance_key), {:notify_group, notif})
   end
 end

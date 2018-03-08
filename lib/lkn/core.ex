@@ -52,11 +52,6 @@ defmodule Lkn.Core do
       {:via, Registry, {Lkn.Core.Registry, {:engine, instance_key, sys}}}
     end
 
-    @spec notify_group(Instance.k) :: t
-    def notify_group(instance_key) do
-      {:engine, instance_key, :notifier}
-    end
-
     @spec instance(Instance.k) :: t
     def instance(instance_key) do
       {:via, Registry, {Lkn.Core.Registry, {:instance, instance_key}}}
@@ -94,7 +89,6 @@ defmodule Lkn.Core do
   def init(_) do
     children = [
       supervisor(Registry, [:unique, Lkn.Core.Registry], id: :core_registry),
-      supervisor(Registry, [:duplicate, Lkn.Core.Notifier], id: :core_notifier),
       supervisor(Lkn.Core.Pool.Supervisor, [])
     ]
 
