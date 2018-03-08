@@ -1,5 +1,14 @@
 # ChangeLog
 
+## lkn_core 0.4.2
+
+* Rely on the Instance to notify the registered Puppeteers. We were using a
+  Registry before, but the latter are not very tolerant with process crash.
+
+## lkn_core 0.4.1
+
+* Fix a minor error in the System module interface
+
 ## lkn_core 0.4.0
 
 * **[Breaking Change]** It is no possible to send per-system options when
