@@ -343,6 +343,11 @@ defmodule Lkn.Core.Instance do
       {:reply, true, state}
     end
   end
+  def handle_call({:proxy_call, to, msg}, _from, state) do
+    res = GenServer.call(to, msg)
+
+    {:reply, res, state}
+  end
   def handle_call({:unregister_puppet, puppet_key}, _from, state) do
     state = if MapSet.member?(state.puppets, puppet_key) do
       # unregister the pupet from each systems
@@ -385,8 +390,23 @@ defmodule Lkn.Core.Instance do
 
     {:noreply, state}
   end
+  def handle_cast({:proxy_cast, to, message}, state) do
+    GenServer.cast(to, message)
+
+    {:noreply, state}
+  end
 
   def notify_puppeteers(instance_key, notif) do
     GenServer.cast(Name.instance(instance_key), {:notify_group, notif})
+  end
+
+  @doc false
+  def proxy_cast(instance_key, target, message) do
+    GenServer.cast(Name.instance(instance_key), {:proxy_cast, target, message})
+  end
+
+  @doc false
+  def proxy_call(instance_key, target, message) do
+    GenServer.call(Name.instance(instance_key), {:proxy_call, target, message})
   end
 end

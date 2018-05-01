@@ -236,6 +236,12 @@ defmodule Lkn.Core.System do
     key_to_name = quote do
       &(Lkn.Core.Name.system(&1, unquote(name)))
     end
+    proxy_cast = quote do
+      &(Lkn.Core.Instance.proxy_cast(&1, &2, &3))
+    end
+    proxy_call = quote do
+      &(Lkn.Core.Instance.proxy_call(&1, &2, &3))
+    end
 
     quote do
       defmodule unquote(name) do
@@ -259,6 +265,7 @@ defmodule Lkn.Core.System do
                 quote do unquote(Specs.var_name("map_key")) :: Lkn.Core.Map.k end,
                 quote do unquote(Specs.var_name("puppets")) :: Lkn.Core.System.puppets end,
               ],
+              proxy_names: {proxy_cast, proxy_call}
             ))
 
         @doc false
