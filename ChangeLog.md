@@ -1,5 +1,11 @@
 # ChangeLog
 
+## lkn_core 0.4.3
+
+* The Instance now proxifies all requests targeting Systems, to reduce the risk
+  of race conditions while registering new Puppets.
+* Bump several development dependencies
+
 ## lkn_core 0.4.2
 
 * Rely on the Instance to notify the registered Puppeteers. We were using a
