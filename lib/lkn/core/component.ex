@@ -117,7 +117,7 @@ defmodule Lkn.Core.Component do
               key_type,
               key_to_name,
               state_type,
-              key_name: Specs.var_name("entity_key"),
+              key_name: Specs.var_name("entity_key")
             ))
 
         @doc false
